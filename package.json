@@ -11,8 +11,27 @@
     "build:ui": "vite build",
     "build:server": "node ./node_modules/typescript/lib/tsc.js -p server/tsconfig.json",
     "build": "npm run build:electron && npm run build:ui && npm run build:server",
+    "dist": "npm run build && electron-builder",
     "server": "npx tsx server/src/index.ts",
     "electron:dev": "concurrently \"vite\" \"node ./node_modules/typescript/lib/tsc.js -p tsconfig.electron.json --watch\" \"electron .\""
+  },
+  "build": {
+    "appId": "com.pausepulse.desktop",
+    "productName": "PausePulse",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
