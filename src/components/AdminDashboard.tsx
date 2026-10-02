@@ -1,11 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Users, Droplets, Award, TrendingUp, Sparkles, Plus, CheckCircle, ArrowLeft, RefreshCw, Sun, Moon } from 'lucide-react';
+import {
+  ShieldCheck,
+  Users,
+  Droplets,
+  Award,
+  TrendingUp,
+  Sparkles,
+  Plus,
+  CheckCircle,
+  ArrowLeft,
+  RefreshCw,
+  Sun,
+  Moon,
+  Pencil,
+  Trash2,
+  Lock,
+  UserCheck,
+  ShieldAlert,
+} from 'lucide-react';
 import { AppTheme } from '../types';
 
 interface AdminDashboardProps {
   theme: AppTheme;
   onToggleTheme: () => void;
   onBackToApp: () => void;
+}
+
+export interface RewardItem {
+  id: string;
+  title: string;
+  pointsRequired: number;
+  type: string;
 }
 
 interface HRData {
@@ -19,21 +44,33 @@ interface HRData {
     averageFocusSessionMins: number;
     totalBreaksCompletedThisMonth: number;
   };
-  rewardsActive: Array<{
-    id: string;
-    title: string;
-    pointsRequired: number;
-    type: string;
-  }>;
+  rewardsActive: RewardItem[];
 }
+
+const REWARDS_CACHE_KEY = 'pausepulse_hr_rewards_cache';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleTheme, onBackToApp }) => {
   const isDark = theme === 'dark';
   const [data, setData] = useState<HRData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [newRewardTitle, setNewRewardTitle] = useState<string>('');
-  const [newRewardPoints, setNewRewardPoints] = useState<string>('1000');
+
+  // Role: HR_ADMIN can Add/Edit/Delete rewards; EMPLOYEE can only view rewards
+  const [userRole, setUserRole] = useState<'HR_ADMIN' | 'EMPLOYEE'>('HR_ADMIN');
+
+  // Reward Form States (for both Add and Edit)
   const [showRewardModal, setShowRewardModal] = useState<boolean>(false);
+  const [editingReward, setEditingReward] = useState<RewardItem | null>(null);
+  const [rewardTitle, setRewardTitle] = useState<string>('');
+  const [rewardPoints, setRewardPoints] = useState<string>('1000');
+  const [rewardType, setRewardType] = useState<string>('VOUCHER');
+
+  // Toast feedback
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   const fetchHRData = async () => {
     setLoading(true);
@@ -41,12 +78,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
       const res = await fetch('http://localhost:5000/api/v1/hr/dashboard');
       if (res.ok) {
         const json = await res.json();
+        // Load custom cached rewards if any
+        const cached = localStorage.getItem(REWARDS_CACHE_KEY);
+        if (cached) {
+          json.rewardsActive = JSON.parse(cached);
+        }
         setData(json);
       } else {
         throw new Error('API offline');
       }
     } catch {
       // Fallback mock HR data
+      const defaultRewards: RewardItem[] = [
+        { id: 'rew_1', title: '$20 Coffee Voucher', pointsRequired: 1000, type: 'VOUCHER' },
+        { id: 'rew_2', title: 'Half-Day Wellness Leave', pointsRequired: 2500, type: 'PERK' },
+        { id: 'rew_3', title: 'Ergonomic Desk Accessories', pointsRequired: 4000, type: 'HARDWARE' },
+      ];
+
+      const cached = localStorage.getItem(REWARDS_CACHE_KEY);
+      const rewardsToUse = cached ? JSON.parse(cached) : defaultRewards;
+
       setData({
         companyName: 'Acme Technologies Inc.',
         totalSeats: 25,
@@ -58,11 +109,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
           averageFocusSessionMins: 26,
           totalBreaksCompletedThisMonth: 1240,
         },
-        rewardsActive: [
-          { id: 'rew_1', title: '$20 Coffee Voucher', pointsRequired: 1000, type: 'VOUCHER' },
-          { id: 'rew_2', title: 'Half-Day Wellness Leave', pointsRequired: 2500, type: 'PERK' },
-          { id: 'rew_3', title: 'Ergonomic Desk Accessories', pointsRequired: 4000, type: 'HARDWARE' },
-        ],
+        rewardsActive: rewardsToUse,
       });
     } finally {
       setLoading(false);
@@ -73,31 +120,106 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
     fetchHRData();
   }, []);
 
-  const handleAddReward = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newRewardTitle && data) {
-      const newRew = {
-        id: 'rew_' + Date.now(),
-        title: newRewardTitle,
-        pointsRequired: parseInt(newRewardPoints, 10) || 1000,
-        type: 'VOUCHER',
-      };
-      setData({
-        ...data,
-        rewardsActive: [...data.rewardsActive, newRew],
-      });
-      setNewRewardTitle('');
-      setShowRewardModal(false);
+  const saveRewardsToCache = (rewards: RewardItem[]) => {
+    try {
+      localStorage.setItem(REWARDS_CACHE_KEY, JSON.stringify(rewards));
+    } catch {
+      // Ignore
     }
+  };
+
+  // Open modal in Create mode
+  const handleOpenAddModal = () => {
+    if (userRole !== 'HR_ADMIN') {
+      showToast('Permission denied: Only HR Administrators can add rewards.');
+      return;
+    }
+    setEditingReward(null);
+    setRewardTitle('');
+    setRewardPoints('1000');
+    setRewardType('VOUCHER');
+    setShowRewardModal(true);
+  };
+
+  // Open modal in Edit mode
+  const handleOpenEditModal = (reward: RewardItem) => {
+    if (userRole !== 'HR_ADMIN') {
+      showToast('Permission denied: Employees cannot edit company rewards.');
+      return;
+    }
+    setEditingReward(reward);
+    setRewardTitle(reward.title);
+    setRewardPoints(reward.pointsRequired.toString());
+    setRewardType(reward.type);
+    setShowRewardModal(true);
+  };
+
+  // Delete Reward (HR only)
+  const handleDeleteReward = (id: string, title: string) => {
+    if (userRole !== 'HR_ADMIN') {
+      showToast('Permission denied: Employees cannot delete company rewards.');
+      return;
+    }
+
+    if (!data) return;
+
+    const updated = data.rewardsActive.filter((r) => r.id !== id);
+    setData({
+      ...data,
+      rewardsActive: updated,
+    });
+    saveRewardsToCache(updated);
+    showToast(`Deleted reward: "${title}"`);
+  };
+
+  // Save Reward (Handles both Add and Edit)
+  const handleSaveReward = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (userRole !== 'HR_ADMIN') {
+      showToast('Permission denied: Employees cannot modify rewards.');
+      return;
+    }
+
+    if (!rewardTitle.trim() || !data) return;
+
+    const pts = parseInt(rewardPoints, 10) || 1000;
+
+    let updatedList: RewardItem[];
+
+    if (editingReward) {
+      // Update existing reward
+      updatedList = data.rewardsActive.map((r) =>
+        r.id === editingReward.id
+          ? { ...r, title: rewardTitle.trim(), pointsRequired: pts, type: rewardType }
+          : r
+      );
+      showToast(`Updated reward: "${rewardTitle.trim()}"`);
+    } else {
+      // Add new reward
+      const newRew: RewardItem = {
+        id: 'rew_' + Date.now(),
+        title: rewardTitle.trim(),
+        pointsRequired: pts,
+        type: rewardType,
+      };
+      updatedList = [...data.rewardsActive, newRew];
+      showToast(`Added new reward: "${rewardTitle.trim()}"`);
+    }
+
+    setData({ ...data, rewardsActive: updatedList });
+    saveRewardsToCache(updatedList);
+    setShowRewardModal(false);
+    setEditingReward(null);
   };
 
   return (
     <div
-      className={`w-full h-screen flex flex-col font-['Plus_Jakarta_Sans',sans-serif] overflow-y-auto p-4 transition-colors duration-300 ${
+      className={`w-full h-screen flex flex-col font-['Inter',sans-serif] overflow-y-auto p-4 transition-colors duration-300 ${
         isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}
     >
-      {/* Top Header Navigation */}
+      {/* ── Top Header Navigation ────────────────────── */}
       <div className={`flex items-center justify-between pb-4 border-b mb-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
         <div className="flex items-center space-x-3">
           <button
@@ -126,6 +248,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* 👑 Role Permission Switcher (HR Admin vs Employee View) */}
+          <div className={`p-1 rounded-xl border flex space-x-1 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-200 border-slate-300'}`}>
+            <button
+              type="button"
+              onClick={() => {
+                setUserRole('HR_ADMIN');
+                showToast('Switched to HR Administrator Mode — Full Edit Access');
+              }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                userRole === 'HR_ADMIN'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : isDark
+                  ? 'text-slate-400 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="HR Admin: Can add, edit, and delete company rewards"
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>HR Admin</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUserRole('EMPLOYEE');
+                showToast('Switched to Employee View — Read-Only Mode');
+              }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                userRole === 'EMPLOYEE'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : isDark
+                  ? 'text-slate-400 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Employee: Can view rewards only, cannot edit or delete"
+            >
+              <Lock className="w-3 h-3" />
+              <span>Employee View</span>
+            </button>
+          </div>
+
           {/* Sun/Moon Theme Toggle */}
           <button
             type="button"
@@ -138,7 +300,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
             title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
             {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
-            <span className="text-[11px]">{isDark ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
 
           <button
@@ -153,6 +314,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
           </button>
         </div>
       </div>
+
+      {/* Floating Toast Message */}
+      {toastMessage && (
+        <div className="mb-3 p-2.5 rounded-xl bg-indigo-600 text-white text-xs font-bold flex items-center gap-2 shadow-lg animate-in slide-in-from-top duration-200">
+          <Sparkles className="w-4 h-4" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
@@ -177,6 +346,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
                   Enterprise Tenant
                 </span>
                 <h2 className="text-xl font-extrabold tracking-tight">{data?.companyName}</h2>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20 text-white font-bold">
+                    {userRole === 'HR_ADMIN' ? '👑 Logged in as HR Administrator' : '👤 Logged in as Employee (Read-Only)'}
+                  </span>
+                </div>
               </div>
               <div className="text-right">
                 <span className={`text-3xl font-black font-mono ${isDark ? 'text-emerald-400' : 'text-white'}`}>
@@ -255,38 +429,92 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-2">
                 <Award className="w-4 h-4 text-amber-500" />
-                <h3 className="text-xs font-bold uppercase tracking-wider">Active HR Company Rewards</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider">Company Rewards & Wellness Perks</h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowRewardModal(true)}
-                className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-indigo-500/20"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Reward</span>
-              </button>
+
+              {/* Add Reward Button — HR Only */}
+              {userRole === 'HR_ADMIN' ? (
+                <button
+                  type="button"
+                  onClick={handleOpenAddModal}
+                  className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-indigo-500/20"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Reward</span>
+                </button>
+              ) : (
+                <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 bg-slate-800/60 px-2.5 py-1 rounded-lg border border-slate-700">
+                  <Lock className="w-3 h-3 text-amber-400" />
+                  <span>HR Managed Only</span>
+                </span>
+              )}
             </div>
 
+            {/* Employee Banner Notice */}
+            {userRole === 'EMPLOYEE' && (
+              <div className="mb-3 p-2.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 text-xs flex items-center gap-2">
+                <Lock className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span>
+                  <strong>Employee Notice:</strong> You are viewing active company perks in read-only mode.
+                  Complete breaks and hit hydration targets to earn points towards these perks!
+                </span>
+              </div>
+            )}
+
+            {/* Rewards Cards List */}
             <div className="space-y-2">
               {data?.rewardsActive.map((rew) => (
                 <div
                   key={rew.id}
-                  className={`flex items-center justify-between p-2.5 rounded-xl border transition-colors ${
-                    isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                    isDark ? 'bg-slate-950/60 border-slate-800 hover:border-slate-700' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
                   }`}
                 >
-                  <div className="flex items-center space-x-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 font-bold text-xs">
-                      🏆
+                  <div className="flex items-center space-x-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 font-bold text-sm">
+                      {rew.type === 'VOUCHER' ? '🎟️' : rew.type === 'PERK' ? '🏖️' : rew.type === 'HARDWARE' ? '🖥️' : '🏆'}
                     </div>
                     <div>
                       <div className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{rew.title}</div>
-                      <div className="text-[10px] text-slate-400">Reward Type: {rew.type}</div>
+                      <div className="text-[10px] text-slate-400">Type: {rew.type}</div>
                     </div>
                   </div>
-                  <span className="text-xs font-mono font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
-                    {rew.pointsRequired} pts
-                  </span>
+
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-mono font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                      {rew.pointsRequired} pts
+                    </span>
+
+                    {/* Edit and Delete Buttons — ONLY VISIBLE AND ACCESSIBLE TO HR_ADMIN */}
+                    {userRole === 'HR_ADMIN' && (
+                      <div className="flex items-center space-x-1 pl-2 border-l border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(rew)}
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-800 hover:bg-indigo-600 hover:text-white text-slate-400'
+                              : 'bg-white border-slate-300 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600'
+                          }`}
+                          title={`Edit "${rew.title}"`}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteReward(rew.id, rew.title)}
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                            isDark
+                              ? 'bg-slate-900 border-slate-800 hover:bg-rose-600 hover:text-white text-slate-400'
+                              : 'bg-white border-slate-300 hover:bg-rose-50 hover:text-rose-600 text-slate-600'
+                          }`}
+                          title={`Delete "${rew.title}"`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -307,49 +535,84 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
         </div>
       )}
 
-      {/* Add Reward Modal */}
+      {/* Add / Edit Reward Modal */}
       {showRewardModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
           <div
-            className={`w-full max-w-sm rounded-2xl p-4 space-y-3 border ${
-              isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-xl'
+            className={`w-full max-w-sm rounded-2xl p-5 space-y-4 border ${
+              isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
             }`}
           >
-            <h3 className="text-xs font-bold flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-amber-500" /> Add New HR Employee Reward
-            </h3>
-            <form onSubmit={handleAddReward} className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <span>{editingReward ? 'Edit HR Company Reward' : 'Add New HR Company Reward'}</span>
+              </h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400">
+                HR Admin
+              </span>
+            </div>
+
+            <form onSubmit={handleSaveReward} className="space-y-3">
               <div>
-                <label className={`text-[11px] block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Reward Title</label>
+                <label className={`text-[11px] font-semibold block mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Reward Title
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. $25 Amazon Gift Card"
-                  value={newRewardTitle}
-                  onChange={(e) => setNewRewardTitle(e.target.value)}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500 ${
+                  value={rewardTitle}
+                  onChange={(e) => setRewardTitle(e.target.value)}
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 ${
                     isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
                   }`}
                   required
+                  autoFocus
                 />
               </div>
+
               <div>
-                <label className={`text-[11px] block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Points Required</label>
+                <label className={`text-[11px] font-semibold block mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Points Required
+                </label>
                 <input
                   type="number"
                   placeholder="e.g. 1500"
-                  value={newRewardPoints}
-                  onChange={(e) => setNewRewardPoints(e.target.value)}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-mono ${
+                  value={rewardPoints}
+                  onChange={(e) => setRewardPoints(e.target.value)}
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-mono ${
                     isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
                   }`}
                   required
                 />
               </div>
-              <div className="flex justify-end space-x-2 pt-2">
+
+              <div>
+                <label className={`text-[11px] font-semibold block mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Reward Category / Type
+                </label>
+                <select
+                  value={rewardType}
+                  onChange={(e) => setRewardType(e.target.value)}
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 ${
+                    isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                  }`}
+                >
+                  <option value="VOUCHER">🎟️ Voucher / Gift Card</option>
+                  <option value="PERK">🏖️ Wellness Leave / Day Off</option>
+                  <option value="HARDWARE">🖥️ Ergonomic Equipment / Desk</option>
+                  <option value="BADGE">🏆 Recognition & Badge</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2 border-t border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setShowRewardModal(false)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                  onClick={() => {
+                    setShowRewardModal(false);
+                    setEditingReward(null);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer ${
                     isDark ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
                   }`}
                 >
@@ -357,10 +620,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
                 </button>
                 <button
                   type="submit"
-                  className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-bold cursor-pointer"
+                  className="flex items-center space-x-1.5 px-4 py-1.5 rounded-xl text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-bold cursor-pointer shadow-md shadow-indigo-500/20 active:scale-95"
                 >
                   <CheckCircle className="w-3.5 h-3.5" />
-                  <span>Save Reward</span>
+                  <span>{editingReward ? 'Update Reward' : 'Save Reward'}</span>
                 </button>
               </div>
             </form>

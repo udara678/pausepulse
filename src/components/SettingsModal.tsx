@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Volume2, VolumeX, ShieldAlert, Sliders, BellOff, Check, Music, Upload, Play, Sun, Moon, Utensils } from 'lucide-react';
+import { X, Volume2, VolumeX, ShieldAlert, Sliders, BellOff, Check, Music, Upload, Play, Sun, Moon, Utensils, Coffee } from 'lucide-react';
 import { Settings, SoundTone } from '../types';
 import { soundEngine } from '../utils/audio';
 
@@ -18,11 +18,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [localSettings, setLocalSettings] = useState<Settings>(settings);
   const [customMinsInput, setCustomMinsInput] = useState<string>('');
+  const [customBreakMinsInput, setCustomBreakMinsInput] = useState<string>('');
   const [customMlInput, setCustomMlInput] = useState<string>('');
 
   useEffect(() => {
     setLocalSettings(settings);
     setCustomMinsInput(settings.breakIntervalMins.toString());
+    setCustomBreakMinsInput((settings.breakDurationMins || 3).toString());
     setCustomMlInput(settings.waterTargetMl.toString());
   }, [settings, isOpen]);
 
@@ -37,6 +39,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
+  const handleApplyCustomBreakMins = () => {
+    const bmins = parseInt(customBreakMinsInput, 10);
+    if (!isNaN(bmins) && bmins > 0) {
+      setLocalSettings((prev) => ({ ...prev, breakDurationMins: bmins }));
+    }
+  };
+
   const handleApplyCustomMl = () => {
     const ml = parseInt(customMlInput, 10);
     if (!isNaN(ml) && ml > 0) {
@@ -46,11 +55,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSave = () => {
     const mins = parseInt(customMinsInput, 10);
+    const bmins = parseInt(customBreakMinsInput, 10);
     const ml = parseInt(customMlInput, 10);
 
     const updated: Settings = {
       ...localSettings,
       breakIntervalMins: !isNaN(mins) && mins > 0 ? mins : localSettings.breakIntervalMins,
+      breakDurationMins: !isNaN(bmins) && bmins > 0 ? bmins : localSettings.breakDurationMins,
       waterTargetMl: !isNaN(ml) && ml > 0 ? ml : localSettings.waterTargetMl,
     };
 
@@ -230,6 +241,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   🍱 {lmins}m Lunch
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Micro / Rest Break Duration with Presets & Manual Custom Input */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold flex items-center gap-1">
+                <Coffee className="w-3.5 h-3.5 text-emerald-500" /> Rest Break Duration (Mins)
+              </label>
+              <span className="text-[11px] font-mono text-emerald-500 font-bold">{localSettings.breakDurationMins || 3} mins</span>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5 mb-1.5">
+              {[2, 3, 5, 10].map((bmins) => (
+                <button
+                  key={bmins}
+                  type="button"
+                  onClick={() => {
+                    setLocalSettings({ ...localSettings, breakDurationMins: bmins });
+                    setCustomBreakMinsInput(bmins.toString());
+                  }}
+                  className={`py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                    (localSettings.breakDurationMins || 3) === bmins
+                      ? 'bg-emerald-600 border-emerald-500 text-white shadow-md shadow-emerald-500/20 font-bold'
+                      : isDark
+                      ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                      : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {bmins}m Break
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Break Mins Input with Explicit Set Button */}
+            <div className="flex items-center space-x-1.5">
+              <input
+                type="number"
+                placeholder="Custom break mins (e.g. 7)"
+                value={customBreakMinsInput}
+                onChange={(e) => setCustomBreakMinsInput(e.target.value)}
+                className={`flex-1 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500 font-mono border ${
+                  isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={handleApplyCustomBreakMins}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                Set Break
+              </button>
             </div>
           </div>
 
