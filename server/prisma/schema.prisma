@@ -1,0 +1,78 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  EMPLOYEE
+  HR_ADMIN
+  SUPER_ADMIN
+}
+
+model Company {
+  id                 String   @id @default(uuid())
+  name               String
+  seatCount          Int      @default(10)
+  subscriptionStatus String   @default("ACTIVE") // ACTIVE, TRIAL, CANCELLED
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  users        User[]
+  leaderboards Leaderboard[]
+  rewards      Reward[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  companyId    String?
+  company      Company? @relation(fields: [companyId], references: [id])
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(EMPLOYEE)
+  points       Int      @default(0)
+  streakDays   Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  logs WellnessLog[]
+}
+
+model WellnessLog {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  date            String   // YYYY-MM-DD
+  activeMinutes   Int      @default(0)
+  idleMinutes     Int      @default(0)
+  breaksCompleted Int      @default(0)
+  waterIntakeMl   Int      @default(0)
+  pointsEarned    Int      @default(0)
+  createdAt       DateTime @default(now())
+}
+
+model Leaderboard {
+  id                   String   @id @default(uuid())
+  companyId            String
+  company              Company  @relation(fields: [companyId], references: [id])
+  month                String   // YYYY-MM
+  anonymizedHealthScore Int     @default(85) // 0-100% compliance
+  totalTeamPoints      Int      @default(0)
+  activeMembers        Int      @default(0)
+  updatedAt            DateTime @updatedAt
+}
+
+model Reward {
+  id             String   @id @default(uuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id])
+  title          String
+  description    String
+  pointsRequired Int
+  rewardType     String   // VOUCHER, PERK, BADGE
+  createdAt      DateTime @default(now())
+}
