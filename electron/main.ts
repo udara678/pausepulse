@@ -9,12 +9,14 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 420,
-    height: 640,
+    width: 980,
+    height: 680,
+    minWidth: 860,
+    minHeight: 600,
     show: false,
     frame: false,
-    resizable: false,
-    alwaysOnTop: true,
+    resizable: true,
+    alwaysOnTop: false,
     skipTaskbar: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
