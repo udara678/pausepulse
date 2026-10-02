@@ -76,3 +76,14 @@ model Reward {
   rewardType     String   // VOUCHER, PERK, BADGE
   createdAt      DateTime @default(now())
 }
+
+model LicenseKey {
+  id              String    @id @default(uuid())
+  key             String    @unique
+  email           String
+  plan            String    @default("monthly") // monthly | yearly | team
+  activatedAt     DateTime?
+  expiresAt       DateTime?
+  stripeSessionId String?
+  createdAt       DateTime  @default(now())
+}

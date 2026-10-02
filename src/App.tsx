@@ -7,9 +7,13 @@ import { SettingsModal } from './components/SettingsModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { FocusCheckpointModal } from './components/FocusCheckpointModal';
 import { BreakActivitiesModal } from './components/BreakActivitiesModal';
+import { LicenseGate } from './components/LicenseGate';
 import { Shield, Bell, LayoutDashboard, Bookmark, X, Utensils } from 'lucide-react';
 import { UserStats, Settings, TimerMode, AppTheme } from './types';
 import { soundEngine } from './utils/audio';
+
+const TRIAL_STARTED_KEY = 'pausepulse_trial_started';
+const LICENSE_KEY_STORE = 'pausepulse_license';
 
 const DEFAULT_SETTINGS: Settings = {
   hydrationIntervalMins: 60,
@@ -27,6 +31,31 @@ const DEFAULT_SETTINGS: Settings = {
 
 export default function App() {
   const [view, setView] = useState<'APP' | 'ADMIN'>('APP');
+  // License: 'checking' | 'unlocked' | 'gate'
+  const [licenseStatus, setLicenseStatus] = useState<'checking' | 'unlocked' | 'gate'>('checking');
+
+  // Check license / trial on startup
+  useEffect(() => {
+    const savedKey = localStorage.getItem(LICENSE_KEY_STORE);
+    const trialStart = localStorage.getItem(TRIAL_STARTED_KEY);
+
+    if (savedKey) {
+      // Has a saved key — treat as unlocked (background verify happens in LicenseGate)
+      setLicenseStatus('unlocked');
+      return;
+    }
+
+    if (trialStart) {
+      const daysUsed = (Date.now() - new Date(trialStart).getTime()) / (1000 * 60 * 60 * 24);
+      if (daysUsed < 7) {
+        setLicenseStatus('unlocked'); // Still in trial
+        return;
+      }
+    }
+
+    // No key, no valid trial → show gate
+    setLicenseStatus('gate');
+  }, []);
 
   // Load settings from localStorage
   const [settings, setSettings] = useState<Settings>(() => {
@@ -254,6 +283,29 @@ export default function App() {
   };
 
   const isDark = settings.theme === 'dark';
+
+  // Show license gate if not activated and trial not started
+  if (licenseStatus === 'gate') {
+    return (
+      <LicenseGate
+        theme={settings.theme}
+        onActivated={(_plan) => setLicenseStatus('unlocked')}
+        onTrial={() => {
+          localStorage.setItem(TRIAL_STARTED_KEY, new Date().toISOString());
+          setLicenseStatus('unlocked');
+        }}
+      />
+    );
+  }
+
+  // Loading state while checking license
+  if (licenseStatus === 'checking') {
+    return (
+      <div className={`flex items-center justify-center h-screen ${isDark ? 'bg-slate-950' : 'bg-slate-100'}`}>
+        <div className="w-8 h-8 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   if (view === 'ADMIN') {
     return (

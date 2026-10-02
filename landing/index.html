@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PausePulse — Work Smarter. Rest Intentionally.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'slate-950': '#0f172a',
+            'indigo-500': '#6366f1',
+            'indigo-600': '#4f46e5',
+            'cyan-400': '#22d3ee',
+            'cyan-500': '#06b6d4',
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          backgroundImage: {
+            'hero-gradient': 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99,102,241,0.25) 0%, transparent 70%)',
+            'card-gradient': 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(34,211,238,0.05) 100%)',
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: #0f172a;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 3px; }
+
+    /* Glassmorphism */
+    .glass {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .glass-strong {
+      background: rgba(255,255,255,0.07);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    /* Gradient text */
+    .gradient-text {
+      background: linear-gradient(135deg, #6366f1 0%, #22d3ee 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .gradient-text-warm {
+      background: linear-gradient(135deg, #f472b6 0%, #6366f1 50%, #22d3ee 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Glow effects */
+    .glow-indigo { box-shadow: 0 0 40px rgba(99,102,241,0.3), 0 0 80px rgba(99,102,241,0.1); }
+    .glow-cyan   { box-shadow: 0 0 40px rgba(34,211,238,0.2), 0 0 80px rgba(34,211,238,0.05); }
+    .btn-glow:hover { box-shadow: 0 0 24px rgba(99,102,241,0.6), 0 4px 20px rgba(99,102,241,0.4); }
+    .btn-glow-cyan:hover { box-shadow: 0 0 24px rgba(34,211,238,0.4), 0 4px 20px rgba(34,211,238,0.3); }
+
+    /* Feature card hover */
+    .feature-card {
+      transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .feature-card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(99,102,241,0.4);
+      box-shadow: 0 20px 60px rgba(99,102,241,0.15), 0 0 0 1px rgba(99,102,241,0.2);
+    }
+
+    /* Pricing card hover */
+    .pricing-card {
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .pricing-card:hover {
+      transform: translateY(-8px);
+    }
+    .pricing-featured {
+      border: 1px solid rgba(99,102,241,0.5);
+      box-shadow: 0 0 60px rgba(99,102,241,0.2), inset 0 0 40px rgba(99,102,241,0.05);
+    }
+    .pricing-featured:hover {
+      box-shadow: 0 20px 80px rgba(99,102,241,0.35), inset 0 0 40px rgba(99,102,241,0.08);
+    }
+
+    /* Noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    /* Animated gradient orbs */
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      animation: float 8s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) scale(1); }
+      50%       { transform: translateY(-30px) scale(1.05); }
+    }
+
+    /* App mockup styles */
+    .app-mockup {
+      background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .mockup-bar { background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .mockup-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+    /* Progress bar animation */
+    @keyframes progress-fill {
+      from { width: 0%; }
+      to   { width: 68%; }
+    }
+    .progress-animated { animation: progress-fill 2s ease-out 0.5s both; }
+
+    /* Pulse ring */
+    @keyframes pulse-ring {
+      0%   { transform: scale(1); opacity: 1; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+    .pulse-ring::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 2px solid #6366f1;
+      animation: pulse-ring 2s ease-out infinite;
+    }
+
+    /* Nav link underline effect */
+    .nav-link {
+      position: relative;
+      transition: color 0.2s;
+    }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #6366f1, #22d3ee);
+      transition: width 0.3s ease;
+      border-radius: 1px;
+    }
+    .nav-link:hover::after { width: 100%; }
+    .nav-link:hover { color: #e2e8f0; }
+
+    /* Badge */
+    .badge {
+      background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(34,211,238,0.15));
+      border: 1px solid rgba(99,102,241,0.35);
+      border-radius: 999px;
+      padding: 4px 14px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #a5b4fc;
+    }
+
+    /* Section heading decoration */
+    .section-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    /* Divider line */
+    .gradient-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(99,102,241,0.4), transparent);
+    }
+
+    /* Checkmark list */
+    .check-list li { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+    .check-list li::before {
+      content: '✓';
+      color: #22d3ee;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* Mobile menu */
+    #mobile-menu { display: none; }
+    #mobile-menu.open { display: block; }
+
+    /* Stat counter */
+    .stat-card {
+      background: rgba(99,102,241,0.08);
+      border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 12px;
+      padding: 20px 24px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="relative z-10">
+
+  <!-- ═══════════════════════════════════════════════
+       NAVIGATION
+  ═══════════════════════════════════════════════ -->
+  <nav id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
+       style="backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); background: rgba(15,23,42,0.85); border-bottom: 1px solid rgba(255,255,255,0.06);">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+
+        <!-- Logo -->
+        <a href="#" class="flex items-center gap-3 group">
+          <div class="relative w-9 h-9 flex-shrink-0">
+            <div class="absolute inset-0 bg-indigo-500 rounded-xl opacity-20 group-hover:opacity-40 transition-opacity blur-sm"></div>
+            <div class="relative w-9 h-9 bg-gradient-to-br from-indigo-500 to-cyan-400 rounded-xl flex items-center justify-center shadow-lg">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="10" cy="10" r="7" stroke="white" stroke-width="2"/>
+                <path d="M10 6v4l2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="10" cy="10" r="1.5" fill="white"/>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="text-white font-bold text-lg leading-tight tracking-tight">PausePulse</div>
+            <div class="text-xs text-slate-500 leading-none font-medium">Ergonomic Break Manager</div>
+          </div>
+        </a>
+
+        <!-- Desktop Nav -->
+        <div class="hidden md:flex items-center gap-8">
+          <a href="#features" class="nav-link text-slate-400 text-sm font-medium">Features</a>
+          <a href="#pricing"  class="nav-link text-slate-400 text-sm font-medium">Pricing</a>
+          <a href="#download" class="nav-link text-slate-400 text-sm font-medium">Download</a>
+        </div>
+
+        <!-- CTA Buttons -->
+        <div class="hidden md:flex items-center gap-3">
+          <a href="#download"
+             class="px-4 py-2 text-sm font-semibold text-indigo-400 border border-indigo-500/40 rounded-lg hover:bg-indigo-500/10 hover:border-indigo-500/70 transition-all duration-200">
+            Download
+          </a>
+          <a href="#pricing"
+             class="btn-glow px-5 py-2 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-lg transition-all duration-200 shadow-lg">
+            Buy Now
+          </a>
+        </div>
+
+        <!-- Mobile hamburger -->
+        <button id="menu-btn" class="md:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                onclick="document.getElementById('mobile-menu').classList.toggle('open')">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile menu -->
+    <div id="mobile-menu" class="md:hidden border-t border-white/5">
+      <div class="px-4 py-4 flex flex-col gap-3">
+        <a href="#features" class="text-slate-300 text-sm font-medium py-2 hover:text-indigo-400 transition-colors"
+           onclick="document.getElementById('mobile-menu').classList.remove('open')">Features</a>
+        <a href="#pricing"  class="text-slate-300 text-sm font-medium py-2 hover:text-indigo-400 transition-colors"
+           onclick="document.getElementById('mobile-menu').classList.remove('open')">Pricing</a>
+        <a href="#download" class="text-slate-300 text-sm font-medium py-2 hover:text-indigo-400 transition-colors"
+           onclick="document.getElementById('mobile-menu').classList.remove('open')">Download</a>
+        <div class="flex gap-3 pt-2">
+          <a href="#download" class="flex-1 text-center px-4 py-2 text-sm font-semibold text-indigo-400 border border-indigo-500/40 rounded-lg">Download</a>
+          <a href="#pricing"  class="flex-1 text-center px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-lg">Buy Now</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════
+       HERO SECTION
+  ═══════════════════════════════════════════════ -->
+  <section class="relative min-h-screen flex flex-col items-center justify-center pt-16 pb-24 overflow-hidden">
+
+    <!-- Gradient orbs -->
+    <div class="orb w-96 h-96 bg-indigo-600/20 top-10 -left-32" style="animation-delay: 0s;"></div>
+    <div class="orb w-80 h-80 bg-cyan-400/10 top-20 -right-24" style="animation-delay: 3s;"></div>
+    <div class="orb w-64 h-64 bg-indigo-500/15 bottom-0 left-1/3" style="animation-delay: 1.5s;"></div>
+
+    <!-- Hero gradient top -->
+    <div class="absolute inset-0 bg-hero-gradient pointer-events-none"></div>
+
+    <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+      <div class="text-center max-w-4xl mx-auto mb-16">
+
+        <!-- Eyebrow badge -->
+        <div class="flex justify-center mb-6">
+          <span class="badge">✨ Now with AI Mood Coaching</span>
+        </div>
+
+        <!-- Main headline -->
+        <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-tight tracking-tight mb-6">
+          <span class="text-white">Work Smarter.</span><br/>
+          <span class="gradient-text">Rest Intentionally.</span><br/>
+          <span class="text-white">Perform at Your Peak.</span>
+        </h1>
+
+        <!-- Subheadline -->
+        <p class="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed mb-10">
+          PausePulse is the ergonomic break manager that keeps you focused, hydrated, and mentally sharp —
+          turning every pause into a productivity superpower for individuals and teams.
+        </p>
+
+        <!-- CTA Buttons -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a href="#download"
+             class="btn-glow w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-bold text-white bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-xl transition-all duration-200 shadow-xl">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 4v11"/>
+            </svg>
+            Download Free Trial
+          </a>
+          <a href="#pricing"
+             class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-semibold text-slate-300 glass rounded-xl hover:text-white hover:border-indigo-500/40 transition-all duration-200">
+            View Pricing
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+
+        <!-- Social proof -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-6 mt-10 text-sm text-slate-500">
+          <div class="flex items-center gap-2">
+            <div class="flex -space-x-2">
+              <div class="w-7 h-7 rounded-full bg-gradient-to-br from-pink-400 to-indigo-500 border-2 border-slate-900 flex items-center justify-center text-xs font-bold text-white">A</div>
+              <div class="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 border-2 border-slate-900 flex items-center justify-center text-xs font-bold text-white">B</div>
+              <div class="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 border-2 border-slate-900 flex items-center justify-center text-xs font-bold text-white">C</div>
+              <div class="w-7 h-7 rounded-full bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-xs font-bold text-slate-400">+</div>
+            </div>
+            <span>12,000+ happy users</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-amber-400">★★★★★</span>
+            <span>4.9/5 rating</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-green-400">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Free to start
+          </div>
+        </div>
+      </div>
+
+      <!-- App Screenshot Mockup -->
+      <div class="max-w-4xl mx-auto relative">
+        <!-- Glow behind mockup -->
+        <div class="absolute inset-0 bg-indigo-500/10 blur-3xl rounded-3xl transform scale-95"></div>
+
+        <div class="relative app-mockup shadow-2xl glow-indigo">
+          <!-- Title bar -->
+          <div class="mockup-bar px-5 py-3 flex items-center gap-3">
+            <span class="mockup-dot bg-red-500/80"></span>
+            <span class="mockup-dot bg-amber-500/80"></span>
+            <span class="mockup-dot bg-green-500/80"></span>
+            <div class="flex-1 mx-4">
+              <div class="h-5 rounded-md bg-slate-700/60 flex items-center px-3 gap-2 max-w-xs mx-auto">
+                <div class="w-3 h-3 rounded-full bg-slate-600"></div>
+                <div class="h-2 rounded bg-slate-600 w-32"></div>
+              </div>
+            </div>
+            <div class="text-xs text-slate-500 font-medium">PausePulse v2.1</div>
+          </div>
+
+          <!-- App body -->
+          <div class="flex" style="min-height: 400px;">
+            <!-- Sidebar -->
+            <div class="w-56 border-r border-white/5 p-4 flex flex-col gap-2 hidden sm:flex" style="background: rgba(15,23,42,0.8);">
+              <div class="text-xs text-slate-600 font-semibold uppercase tracking-wider mb-2 px-2">Dashboard</div>
+              <div class="flex items-center gap-3 px-3 py-2 rounded-lg bg-indigo-500/20 text-indigo-300 text-sm font-medium">
+                <span>⏱️</span> Focus Timer
+              </div>
+              <div class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 text-sm hover:bg-white/5 transition-colors cursor-default">
+                <span>💧</span> Hydration
+              </div>
+              <div class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 text-sm hover:bg-white/5 transition-colors cursor-default">
+                <span>🧠</span> Mood Coach
+              </div>
+              <div class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 text-sm hover:bg-white/5 transition-colors cursor-default">
+                <span>🫁</span> Breathing
+              </div>
+              <div class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 text-sm hover:bg-white/5 transition-colors cursor-default">
+                <span>🏆</span> Achievements
+              </div>
+              <div class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 text-sm hover:bg-white/5 transition-colors cursor-default">
+                <span>📊</span> Analytics
+              </div>
+
+              <!-- Level badge -->
+              <div class="mt-auto p-3 rounded-xl" style="background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(34,211,238,0.1)); border: 1px solid rgba(99,102,241,0.25);">
+                <div class="text-xs text-slate-500 mb-1">Your Level</div>
+                <div class="flex items-center justify-between">
+                  <div class="text-sm font-bold text-indigo-300">⚡ Pro</div>
+                  <div class="text-xs text-cyan-400 font-semibold">2,340 pts</div>
+                </div>
+                <div class="mt-2 h-1.5 rounded-full bg-slate-700">
+                  <div class="h-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-cyan-400" style="width: 68%;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Main area -->
+            <div class="flex-1 p-6">
+              <!-- Top bar -->
+              <div class="flex items-center justify-between mb-6">
+                <div>
+                  <h3 class="text-white font-bold text-lg">Focus Session</h3>
+                  <p class="text-slate-500 text-sm">Deep work mode active</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <div class="h-2 w-2 rounded-full bg-green-400 animate-pulse"></div>
+                  <span class="text-sm text-green-400 font-medium">Active</span>
+                </div>
+              </div>
+
+              <!-- Timer -->
+              <div class="flex flex-col items-center justify-center py-8 mb-6">
+                <div class="relative inline-flex items-center justify-center mb-4">
+                  <!-- SVG circle timer -->
+                  <svg width="160" height="160" viewBox="0 0 160 160" class="transform -rotate-90">
+                    <circle cx="80" cy="80" r="70" fill="none" stroke="rgba(99,102,241,0.15)" stroke-width="8"/>
+                    <circle cx="80" cy="80" r="70" fill="none" stroke="url(#timerGrad)" stroke-width="8"
+                            stroke-linecap="round" stroke-dasharray="440" stroke-dashoffset="120"/>
+                    <defs>
+                      <linearGradient id="timerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#6366f1"/>
+                        <stop offset="100%" stop-color="#22d3ee"/>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div class="absolute text-center">
+                    <div class="text-3xl font-black text-white tracking-tight">18:42</div>
+                    <div class="text-xs text-slate-500 font-medium mt-1">remaining</div>
+                  </div>
+                </div>
+                <div class="flex gap-3">
+                  <button class="px-5 py-2 rounded-lg bg-indigo-600/30 text-indigo-300 text-sm font-semibold border border-indigo-500/30 hover:bg-indigo-600/50 transition-colors cursor-default">⏸ Pause</button>
+                  <button class="px-5 py-2 rounded-lg bg-slate-700/50 text-slate-400 text-sm font-semibold border border-white/5 cursor-default">↺ Reset</button>
+                </div>
+              </div>
+
+              <!-- Stats row -->
+              <div class="grid grid-cols-3 gap-3">
+                <div class="rounded-xl p-3 text-center" style="background: rgba(34,211,238,0.08); border: 1px solid rgba(34,211,238,0.15);">
+                  <div class="text-lg font-bold text-cyan-400">5</div>
+                  <div class="text-xs text-slate-500">Sessions today</div>
+                </div>
+                <div class="rounded-xl p-3 text-center" style="background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.15);">
+                  <div class="text-lg font-bold text-indigo-300">💧 6/8</div>
+                  <div class="text-xs text-slate-500">Water glasses</div>
+                </div>
+                <div class="rounded-xl p-3 text-center" style="background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.15);">
+                  <div class="text-lg font-bold text-amber-400">🔥 12</div>
+                  <div class="text-xs text-slate-500">Day streak</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating badges -->
+        <div class="absolute -top-4 -right-4 sm:right-8 glass rounded-xl px-4 py-3 flex items-center gap-3 shadow-xl">
+          <div class="w-9 h-9 rounded-full bg-green-500/20 flex items-center justify-center text-lg">🎯</div>
+          <div>
+            <div class="text-xs text-slate-500 leading-tight">Focus Score</div>
+            <div class="text-sm font-bold text-white leading-tight">94 / 100</div>
+          </div>
+        </div>
+
+        <div class="absolute -bottom-4 -left-4 sm:left-8 glass rounded-xl px-4 py-3 flex items-center gap-3 shadow-xl">
+          <div class="w-9 h-9 rounded-full bg-indigo-500/20 flex items-center justify-center text-lg">🏆</div>
+          <div>
+            <div class="text-xs text-slate-500 leading-tight">Achievement</div>
+            <div class="text-sm font-bold text-indigo-300 leading-tight">Level Up!</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats bar -->
+  <div class="relative z-10 py-12" style="background: rgba(255,255,255,0.02); border-top: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05);">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+        <div>
+          <div class="text-3xl font-black gradient-text mb-1">12K+</div>
+          <div class="text-sm text-slate-500">Active Users</div>
+        </div>
+        <div>
+          <div class="text-3xl font-black gradient-text mb-1">4.9★</div>
+          <div class="text-sm text-slate-500">User Rating</div>
+        </div>
+        <div>
+          <div class="text-3xl font-black gradient-text mb-1">2M+</div>
+          <div class="text-sm text-slate-500">Breaks Taken</div>
+        </div>
+        <div>
+          <div class="text-3xl font-black gradient-text mb-1">98%</div>
+          <div class="text-sm text-slate-500">Satisfaction Rate</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       FEATURES SECTION
+  ═══════════════════════════════════════════════ -->
+  <section id="features" class="relative z-10 py-24 overflow-hidden">
+    <!-- Background orbs -->
+    <div class="orb w-96 h-96 bg-cyan-400/8 top-0 right-0" style="animation-delay: 2s;"></div>
+    <div class="orb w-64 h-64 bg-indigo-600/10 bottom-0 -left-16" style="animation-delay: 4s;"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+      <!-- Section header -->
+      <div class="text-center mb-16">
+        <div class="section-eyebrow justify-center">
+          <span class="badge">Features</span>
+        </div>
+        <h2 class="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-4">
+          Everything you need to<br/>
+          <span class="gradient-text">perform at your best</span>
+        </h2>
+        <p class="text-slate-400 text-lg max-w-2xl mx-auto">
+          Six powerful modules work together seamlessly to build sustainable work habits and protect your long-term health.
+        </p>
+      </div>
+
+      <!-- Feature cards grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <!-- Card 1: Smart Focus Timer -->
+        <div class="feature-card glass rounded-2xl p-7">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-5"
+               style="background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(99,102,241,0.1)); border: 1px solid rgba(99,102,241,0.3);">
+            ⏱️
+          </div>
+          <h3 class="text-lg font-bold text-white mb-3">Smart Focus Timer</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Pomodoro-style sessions with an intelligent anti-cheat lock that ensures you fully complete
+            your focus blocks — no sneaking past your own goals.
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 font-medium">25/5 min cycles</span>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 font-medium">Anti-cheat lock</span>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 font-medium">Custom sessions</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Hydration Tracker -->
+        <div class="feature-card glass rounded-2xl p-7">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-5"
+               style="background: linear-gradient(135deg, rgba(34,211,238,0.25), rgba(34,211,238,0.1)); border: 1px solid rgba(34,211,238,0.3);">
+            💧
+          </div>
+          <h3 class="text-lg font-bold text-white mb-3">Hydration Tracker</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Set a daily water goal and watch the animated progress bar fill up. Smart reminders nudge
+            you to drink at the perfect intervals throughout your workday.
+          </p>
+          <!-- Animated mini progress -->
+          <div class="h-2 rounded-full bg-slate-700/60 overflow-hidden">
+            <div class="progress-animated h-2 rounded-full" style="background: linear-gradient(90deg, #22d3ee, #6366f1);"></div>
+          </div>
+          <div class="flex justify-between text-xs text-slate-500 mt-1.5 font-medium">
+            <span>Today: 1.7L / 2.5L</span>
+            <span>68%</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Mood Coach -->
+        <div class="feature-card glass rounded-2xl p-7">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-5"
+               style="background: linear-gradient(135deg, rgba(167,139,250,0.25), rgba(167,139,250,0.1)); border: 1px solid rgba(167,139,250,0.3);">
+            🧠
+          </div>
+          <h3 class="text-lg font-bold text-white mb-3">Mood Coach</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Check in with 6 distinct mood states and receive targeted micro-activities — from quick
+            stretches to mindful breathing — perfectly matched to how you feel right now.
+          </p>
+          <div class="flex gap-2 flex-wrap">
+            <span class="text-xl" title="Energized">😄</span>
+            <span class="text-xl" title="Focused">🎯</span>
+            <span class="text-xl" title="Stressed">😰</span>
+            <span class="text-xl" title="Tired">😴</span>
+            <span class="text-xl" title="Calm">😌</span>
+            <span class="text-xl" title="Anxious">😟</span>
+          </div>
+        </div>
+
+        <!-- Card 4: Guided Breathing -->
+        <div class="feature-card glass rounded-2xl p-7">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-5"
+               style="background: linear-gradient(135deg, rgba(52,211,153,0.25), rgba(52,211,153,0.1)); border: 1px solid rgba(52,211,153,0.3);">
+            🫁
+          </div>
+          <h3 class="text-lg font-bold text-white mb-3">Guided Breathing</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Science-backed 3-phase box breathing technique — Inhale → Hold → Exhale — with a
+            beautiful animated visual guide to reduce stress and sharpen focus in minutes.
+          </p>
+          <!-- Breathing mini-viz -->
+          <div class="flex items-center justify-center gap-2 py-2">
+            <div class="flex flex-col items-center">
+              <div class="w-3 h-3 rounded-full bg-cyan-400 mb-1.5 animate-pulse"></div>
+              <span class="text-xs text-cyan-400 font-semibold">Inhale</span>
+              <span class="text-xs text-slate-600">4s</span>
+            </div>
+            <div class="h-px w-6 bg-slate-700"></div>
+            <div class="flex flex-col items-center">
+              <div class="w-3 h-3 rounded-full bg-indigo-400 mb-1.5" style="animation: pulse 2s ease-in-out infinite 0.5s;"></div>
+              <span class="text-xs text-indigo-400 font-semibold">Hold</span>
+              <span class="text-xs text-slate-600">4s</span>
+            </div>
+            <div class="h-px w-6 bg-slate-700"></div>
+            <div class="flex flex-col items-center">
+              <div class="w-3 h-3 rounded-full bg-purple-400 mb-1.5" style="animation: pulse 2s ease-in-out infinite 1s;"></div>
+              <span class="text-xs text-purple-400 font-semibold">Exhale</span>
+              <span class="text-xs text-slate-600">4s</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 5: Gamification -->
+        <div class="feature-card glass rounded-2xl p-7">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-5"
+               style="background: linear-gradient(135deg, rgba(251,191,36,0.25), rgba(251,191,36,0.1)); border: 1px solid rgba(251,191,36,0.3);">
+            🏆
+          </div>
+          <h3 class="text-lg font-bold text-white mb-3">Gamification</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Earn points, build streaks, and climb through 4 achievement tiers — Beginner, Achiever,
+            Pro, and Elite — making every good habit feel rewarding and worth maintaining.
+          </p>
+          <!-- Level tiers -->
+          <div class="flex gap-2">
+            <div class="flex-1 py-1 rounded-lg text-center text-xs font-bold bg-slate-700/60 text-slate-400">🌱 Starter</div>
+            <div class="flex-1 py-1 rounded-lg text-center text-xs font-bold bg-blue-500/15 text-blue-400 border border-blue-500/25">⚡ Achiever</div>
+            <div class="flex-1 py-1 rounded-lg text-center text-xs font-bold bg-indigo-500/25 text-indigo-300 border border-indigo-500/40">🚀 Pro</div>
+            <div class="flex-1 py-1 rounded-lg text-center text-xs font-bold" style="background: linear-gradient(135deg, rgba(251,191,36,0.2), rgba(249,115,22,0.15)); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3);">👑 Elite</div>
+          </div>
+        </div>
+
+        <!-- Card 6: HR Dashboard -->
+        <div class="feature-card glass rounded-2xl p-7">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-5"
+               style="background: linear-gradient(135deg, rgba(239,68,68,0.2), rgba(239,68,68,0.08)); border: 1px solid rgba(239,68,68,0.25);">
+            📊
+          </div>
+          <h3 class="text-lg font-bold text-white mb-3">HR Dashboard</h3>
+          <p class="text-slate-400 text-sm leading-relaxed mb-4">
+            Built for organizations — monitor team wellness metrics, break compliance rates, and
+            productivity trends. Empower HR leaders with actionable data-driven insights.
+          </p>
+          <div class="flex items-center justify-between">
+            <div class="text-center">
+              <div class="text-lg font-bold text-white">89%</div>
+              <div class="text-xs text-slate-500">Compliance</div>
+            </div>
+            <div class="text-center">
+              <div class="text-lg font-bold text-cyan-400">+24%</div>
+              <div class="text-xs text-slate-500">Productivity</div>
+            </div>
+            <div class="text-center">
+              <div class="text-lg font-bold text-green-400">32</div>
+              <div class="text-xs text-slate-500">Team members</div>
+            </div>
+            <div class="text-center">
+              <div class="text-lg font-bold text-amber-400">-18%</div>
+              <div class="text-xs text-slate-500">Sick days</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <div class="gradient-divider max-w-7xl mx-auto"></div>
+
+  <!-- ═══════════════════════════════════════════════
+       PRICING SECTION
+  ═══════════════════════════════════════════════ -->
+  <section id="pricing" class="relative z-10 py-24 overflow-hidden">
+    <!-- Background -->
+    <div class="orb w-96 h-96 bg-indigo-600/12 top-20 left-1/4" style="animation-delay: 1s;"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+      <!-- Section header -->
+      <div class="text-center mb-16">
+        <div class="section-eyebrow justify-center">
+          <span class="badge">Pricing</span>
+        </div>
+        <h2 class="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-4">
+          Simple, transparent<br/>
+          <span class="gradient-text">pricing for everyone</span>
+        </h2>
+        <p class="text-slate-400 text-lg max-w-xl mx-auto">
+          Start free, upgrade when you're ready. No hidden fees, cancel anytime.
+        </p>
+      </div>
+
+      <!-- Pricing cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto items-stretch">
+
+        <!-- Free Trial -->
+        <div class="pricing-card glass rounded-2xl p-8 flex flex-col" style="border: 1px solid rgba(255,255,255,0.07);">
+          <div class="mb-6">
+            <div class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Free Trial</div>
+            <div class="flex items-end gap-2 mb-1">
+              <span class="text-5xl font-black text-white">$0</span>
+            </div>
+            <div class="text-slate-500 text-sm">7 days, no credit card required</div>
+          </div>
+
+          <ul class="check-list text-sm text-slate-300 mb-8 flex-1 space-y-2">
+            <li>Smart Focus Timer</li>
+            <li>Hydration Tracker</li>
+            <li>Basic Mood Check-in</li>
+            <li>Guided Breathing</li>
+            <li>3 achievements unlocked</li>
+            <li class="!text-slate-500"><span class="!text-slate-600">✗</span>&nbsp; HR Dashboard</li>
+            <li class="!text-slate-500"><span class="!text-slate-600">✗</span>&nbsp; Priority Support</li>
+          </ul>
+
+          <a href="#download"
+             class="w-full text-center py-3.5 rounded-xl text-sm font-bold text-indigo-400 border border-indigo-500/40 hover:bg-indigo-500/10 hover:border-indigo-500/70 transition-all duration-200">
+            Start Free Trial
+          </a>
+        </div>
+
+        <!-- Pro Monthly -->
+        <div class="pricing-card glass rounded-2xl p-8 flex flex-col" style="border: 1px solid rgba(255,255,255,0.07);">
+          <div class="mb-6">
+            <div class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Pro Monthly</div>
+            <div class="flex items-end gap-2 mb-1">
+              <span class="text-5xl font-black text-white">$4</span>
+              <span class="text-2xl font-bold text-slate-400 mb-1">.99</span>
+              <span class="text-slate-500 text-sm mb-2">/mo</span>
+            </div>
+            <div class="text-slate-500 text-sm">Billed monthly, cancel anytime</div>
+          </div>
+
+          <ul class="check-list text-sm text-slate-300 mb-8 flex-1 space-y-2">
+            <li>Everything in Free Trial</li>
+            <li>Full Mood Coach (6 states)</li>
+            <li>Advanced Gamification</li>
+            <li>All 4 achievement tiers</li>
+            <li>Custom session lengths</li>
+            <li>Detailed analytics</li>
+            <li class="!text-slate-500"><span class="!text-slate-600">✗</span>&nbsp; HR Dashboard</li>
+          </ul>
+
+          <a href="STRIPE_MONTHLY_URL"
+             class="w-full text-center py-3.5 rounded-xl text-sm font-bold text-white bg-slate-700/60 hover:bg-slate-600/60 border border-white/10 hover:border-white/20 transition-all duration-200">
+            Buy Monthly
+          </a>
+        </div>
+
+        <!-- Pro Yearly — Featured -->
+        <div class="pricing-card pricing-featured rounded-2xl p-8 flex flex-col relative"
+             style="background: linear-gradient(145deg, rgba(99,102,241,0.12) 0%, rgba(34,211,238,0.06) 100%);">
+
+          <!-- Popular badge -->
+          <div class="absolute -top-4 left-1/2 transform -translate-x-1/2">
+            <span class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold text-white shadow-lg"
+                  style="background: linear-gradient(135deg, #6366f1, #22d3ee);">
+              ✨ Best Value
+            </span>
+          </div>
+
+          <div class="mb-6 mt-2">
+            <div class="text-sm font-semibold text-indigo-300 uppercase tracking-wider mb-2">Pro Yearly</div>
+            <div class="flex items-end gap-2 mb-1">
+              <span class="text-5xl font-black text-white">$39</span>
+              <span class="text-slate-500 text-sm mb-2">/year</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="line-through text-slate-600 text-sm">$59.88/yr</span>
+              <span class="text-xs font-bold text-green-400 bg-green-400/10 px-2 py-0.5 rounded-full border border-green-400/20">Save 35%</span>
+            </div>
+          </div>
+
+          <ul class="check-list text-sm text-slate-200 mb-8 flex-1 space-y-2">
+            <li>Everything in Pro Monthly</li>
+            <li>HR Dashboard (teams)</li>
+            <li>Company wellness metrics</li>
+            <li>Priority email support</li>
+            <li>Early access to new features</li>
+            <li>Unlimited team members</li>
+            <li>Advanced export & reports</li>
+          </ul>
+
+          <a href="STRIPE_YEARLY_URL"
+             class="btn-glow w-full text-center py-3.5 rounded-xl text-sm font-bold text-white transition-all duration-200 shadow-xl"
+             style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);">
+            Buy Yearly — Best Value
+          </a>
+
+          <p class="text-xs text-center text-slate-500 mt-3">Secure payment via Stripe · Cancel anytime</p>
+        </div>
+
+      </div>
+
+      <!-- Guarantee -->
+      <div class="mt-12 text-center">
+        <div class="inline-flex items-center gap-3 glass rounded-xl px-6 py-4">
+          <span class="text-2xl">🛡️</span>
+          <div class="text-left">
+            <div class="text-sm font-semibold text-white">30-day money-back guarantee</div>
+            <div class="text-xs text-slate-500">Not happy? We'll refund you — no questions asked.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <div class="gradient-divider max-w-7xl mx-auto"></div>
+
+  <!-- ═══════════════════════════════════════════════
+       DOWNLOAD SECTION
+  ═══════════════════════════════════════════════ -->
+  <section id="download" class="relative z-10 py-24 overflow-hidden">
+    <div class="orb w-80 h-80 bg-cyan-400/10 bottom-0 right-0" style="animation-delay: 0.5s;"></div>
+
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+
+      <div class="section-eyebrow justify-center">
+        <span class="badge">Download</span>
+      </div>
+
+      <h2 class="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-4">
+        Get started in<br/>
+        <span class="gradient-text">under 60 seconds</span>
+      </h2>
+      <p class="text-slate-400 text-lg mb-12 max-w-xl mx-auto">
+        Download PausePulse, install it, and your first focus session will be running before your coffee is ready.
+      </p>
+
+      <!-- Download card -->
+      <div class="glass-strong rounded-2xl p-10 max-w-lg mx-auto mb-8"
+           style="border: 1px solid rgba(99,102,241,0.25);">
+
+        <!-- Windows -->
+        <div class="flex flex-col items-center mb-8">
+          <div class="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 shadow-xl"
+               style="background: linear-gradient(135deg, #0078d4, #005a9e);">
+            <svg viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg" width="44" height="44">
+              <path d="M0 12.4L36 7.4V43H0V12.4Z" fill="white"/>
+              <path d="M40 6.8L88 0V43H40V6.8Z" fill="white"/>
+              <path d="M0 47H36V82.6L0 77.6V47Z" fill="white"/>
+              <path d="M40 47H88V88L40 81.2V47Z" fill="white"/>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-1">Windows</h3>
+          <p class="text-slate-500 text-sm mb-5">Windows 10 / 11 · 64-bit · ~42 MB</p>
+
+          <a href="#"
+             class="btn-glow w-full inline-flex items-center justify-center gap-3 px-8 py-4 text-base font-bold text-white rounded-xl transition-all duration-200 shadow-xl"
+             style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 4v11"/>
+            </svg>
+            Download for Windows
+          </a>
+          <p class="text-xs text-slate-600 mt-3">PausePulse-Setup-v2.1.0.exe · SHA256 verified</p>
+        </div>
+
+        <div class="gradient-divider mb-8"></div>
+
+        <!-- macOS coming soon -->
+        <div class="flex items-center justify-between p-4 rounded-xl" style="background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.1);">
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(255,255,255,0.05);">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="w-7 h-7 text-slate-500">
+                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+              </svg>
+            </div>
+            <div class="text-left">
+              <div class="text-sm font-semibold text-slate-400">macOS</div>
+              <div class="text-xs text-slate-600">Apple Silicon & Intel</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg" style="background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.2);">
+            <div class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></div>
+            <span class="text-xs font-bold text-amber-400">Coming Soon</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Requirements -->
+      <div class="text-sm text-slate-600 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <span>✓ Windows 10 / 11</span>
+        <span class="hidden sm:inline text-slate-800">·</span>
+        <span>✓ 4 GB RAM minimum</span>
+        <span class="hidden sm:inline text-slate-800">·</span>
+        <span>✓ No internet required after setup</span>
+        <span class="hidden sm:inline text-slate-800">·</span>
+        <span>✓ Auto-updates included</span>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       CTA BANNER
+  ═══════════════════════════════════════════════ -->
+  <section class="relative z-10 py-20 overflow-hidden">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="relative rounded-3xl overflow-hidden"
+           style="background: linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(34,211,238,0.1) 100%); border: 1px solid rgba(99,102,241,0.3);">
+        <!-- Inner glow -->
+        <div class="absolute inset-0" style="background: radial-gradient(ellipse 60% 80% at 50% 50%, rgba(99,102,241,0.15), transparent);"></div>
+
+        <div class="relative z-10 text-center py-16 px-8">
+          <h2 class="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-4">
+            Ready to take back<br/>
+            <span class="gradient-text">control of your workday?</span>
+          </h2>
+          <p class="text-slate-400 text-lg mb-10 max-w-xl mx-auto">
+            Join thousands of professionals who've transformed their productivity with PausePulse.
+          </p>
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a href="#download"
+               class="btn-glow w-full sm:w-auto inline-flex items-center justify-center gap-2 px-10 py-4 text-base font-bold text-white rounded-xl shadow-xl transition-all duration-200"
+               style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);">
+              Download Free Trial
+            </a>
+            <a href="#pricing"
+               class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-10 py-4 text-base font-semibold text-slate-300 glass rounded-xl hover:text-white transition-all duration-200">
+              View Pricing →
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       FOOTER
+  ═══════════════════════════════════════════════ -->
+  <footer class="relative z-10 border-t border-white/5" style="background: rgba(10,15,30,0.8);">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+
+        <!-- Logo -->
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-cyan-400 rounded-lg flex items-center justify-center shadow-lg">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10" cy="10" r="7" stroke="white" stroke-width="2"/>
+              <path d="M10 6v4l2.5 2.5" stroke="white" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="10" cy="10" r="1.5" fill="white"/>
+            </svg>
+          </div>
+          <div>
+            <span class="text-white font-bold text-base">PausePulse</span>
+            <span class="text-slate-600 text-sm ml-2">© 2025</span>
+          </div>
+        </div>
+
+        <!-- Links -->
+        <nav class="flex items-center gap-6 text-sm">
+          <a href="#" class="text-slate-500 hover:text-slate-300 transition-colors font-medium">Privacy Policy</a>
+          <a href="#" class="text-slate-500 hover:text-slate-300 transition-colors font-medium">Terms of Service</a>
+          <a href="mailto:hello@pausepulse.app" class="text-slate-500 hover:text-slate-300 transition-colors font-medium">Contact</a>
+        </nav>
+
+        <!-- Social -->
+        <div class="flex items-center gap-3">
+          <a href="#" class="w-9 h-9 rounded-lg glass flex items-center justify-center text-slate-400 hover:text-white hover:border-indigo-500/40 transition-all">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+          </a>
+          <a href="#" class="w-9 h-9 rounded-lg glass flex items-center justify-center text-slate-400 hover:text-white hover:border-indigo-500/40 transition-all">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="gradient-divider mt-8 mb-6"></div>
+
+      <p class="text-center text-xs text-slate-700">
+        Made with ❤️ for focused humans · PausePulse is not affiliated with any employer or HR platform
+      </p>
+    </div>
+  </footer>
+
+  <!-- Scroll-based navbar enhancement -->
+  <script>
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 20) {
+        navbar.style.background = 'rgba(15,23,42,0.95)';
+        navbar.style.borderBottomColor = 'rgba(255,255,255,0.08)';
+      } else {
+        navbar.style.background = 'rgba(15,23,42,0.85)';
+        navbar.style.borderBottomColor = 'rgba(255,255,255,0.06)';
+      }
+    });
+  </script>
+
+</body>
+</html>

@@ -7,6 +7,8 @@ import syncRoutes from './routes/sync';
 import leaderboardRoutes from './routes/leaderboard';
 import hrRoutes from './routes/hr';
 import billingRoutes from './routes/billing';
+import stripeRoutes from './routes/stripe';
+import licenseRoutes from './routes/license';
 
 dotenv.config();
 
@@ -14,6 +16,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
+
+// ⚠️ Stripe webhook must use raw body BEFORE express.json()
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
 // REST API Routes
@@ -22,6 +27,9 @@ app.use('/api/v1/sync', syncRoutes);
 app.use('/api/v1/leaderboard', leaderboardRoutes);
 app.use('/api/v1/hr', hrRoutes);
 app.use('/api/v1/billing', billingRoutes);
+app.use('/api/v1/license', licenseRoutes);
+app.use('/api/stripe', stripeRoutes);
+
 
 // Health check
 app.get('/health', (_req, res) => {
