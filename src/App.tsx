@@ -140,6 +140,11 @@ export default function App() {
   const [isGuidedRunning, setIsGuidedRunning] = useState<boolean>(false);
   const [guidedCompleted, setGuidedCompleted] = useState<boolean>(false);
 
+  // One-time claim flags — reset when activity resets/restarts
+  const [moodActivityClaimed, setMoodActivityClaimed] = useState<boolean>(false);
+  const [breathSessionClaimed, setBreathSessionClaimed] = useState<boolean>(false);
+  const [gameSessionClaimed, setGameSessionClaimed] = useState<boolean>(false);
+
   // Plan selection / upgrade handler
   const handleSelectPlan = (newPlan: UserPlan) => {
     setUserPlan(newPlan);
@@ -374,10 +379,13 @@ export default function App() {
     );
   };
 
-  const handleClaimBonus = (bonusPts: number, activityTitle: string) => {
+  const handleClaimBonus = (bonusPts: number, activityTitle: string, claimType?: 'mood' | 'breath' | 'game') => {
     setStats((prev) => ({ ...prev, points: prev.points + bonusPts }));
     setLevelUpToast(`Claimed +${bonusPts} pts for ${activityTitle}!`);
     setTimeout(() => setLevelUpToast(null), 3500);
+    if (claimType === 'mood') setMoodActivityClaimed(true);
+    if (claimType === 'breath') setBreathSessionClaimed(true);
+    if (claimType === 'game') setGameSessionClaimed(true);
   };
 
   // Helper formatting
@@ -972,6 +980,7 @@ export default function App() {
                         setGuidedTimerSecs(m.durationSecs);
                         setIsGuidedRunning(false);
                         setGuidedCompleted(false);
+                        setMoodActivityClaimed(false); // reset claim for new mood
                       }}
                       className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative ${
                         selectedMood.id === m.id && !isLockedMood
@@ -1029,16 +1038,18 @@ export default function App() {
 
                   <button
                     type="button"
-                    disabled={!guidedCompleted}
-                    onClick={() => handleClaimBonus(30, selectedMood.recommended)}
+                    disabled={!guidedCompleted || moodActivityClaimed}
+                    onClick={() => handleClaimBonus(30, selectedMood.recommended, 'mood')}
                     className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                      guidedCompleted
+                      moodActivityClaimed
+                        ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
+                        : guidedCompleted
                         ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/30 cursor-pointer animate-pulse'
                         : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                     }`}
                   >
                     <Sparkles className="w-3.5 h-3.5 inline mr-1" />
-                    <span>Claim +30 Bonus Pts</span>
+                    <span>{moodActivityClaimed ? 'Claimed ✓' : 'Claim +30 Bonus Pts'}</span>
                   </button>
                 </div>
               </div>
@@ -1103,16 +1114,35 @@ export default function App() {
 
                 <button
                   type="button"
-                  disabled={breathCycles < 1}
-                  onClick={() => handleClaimBonus(30, '3-Phase Breathing')}
+                  onClick={() => {
+                    setIsBreathingActive(false);
+                    setBreathPhase('INHALE');
+                    setBreathSecs(4);
+                    setBreathCycles(0);
+                    setBreathSessionClaimed(false); // allow new claim after reset
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    isDark ? 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800' : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
+                >
+                  <RotateCcw className="w-3.5 h-3.5 inline mr-1" />
+                  Reset
+                </button>
+
+                <button
+                  type="button"
+                  disabled={breathCycles < 1 || breathSessionClaimed}
+                  onClick={() => handleClaimBonus(30, '3-Phase Breathing', 'breath')}
                   className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                    breathCycles >= 1
+                    breathSessionClaimed
+                      ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
+                      : breathCycles >= 1
                       ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/30 cursor-pointer animate-pulse'
                       : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                   }`}
                 >
                   <Sparkles className="w-3.5 h-3.5 inline mr-1" />
-                  <span>Claim +30 Pts</span>
+                  <span>{breathSessionClaimed ? 'Claimed ✓' : 'Claim +30 Pts'}</span>
                 </button>
               </div>
             </div>
@@ -1170,7 +1200,10 @@ export default function App() {
                   <div className="flex items-center justify-between pt-2">
                     <button
                       type="button"
-                      onClick={resetBubbleGame}
+                      onClick={() => {
+                        resetBubbleGame();
+                        setGameSessionClaimed(false); // allow new claim after reset
+                      }}
                       className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
                     >
                       Reset Grid
@@ -1178,16 +1211,18 @@ export default function App() {
 
                     <button
                       type="button"
-                      disabled={gameScore < 50}
-                      onClick={() => handleClaimBonus(30, 'Stress Buster Game')}
+                      disabled={gameScore < 50 || gameSessionClaimed}
+                      onClick={() => handleClaimBonus(30, 'Stress Buster Game', 'game')}
                       className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                        gameScore >= 50
+                        gameSessionClaimed
+                          ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
+                          : gameScore >= 50
                           ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/30 cursor-pointer animate-pulse'
                           : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                       }`}
                     >
                       <Sparkles className="w-3.5 h-3.5 inline mr-1" />
-                      <span>Claim +30 Pts</span>
+                      <span>{gameSessionClaimed ? 'Claimed ✓' : 'Claim +30 Pts'}</span>
                     </button>
                   </div>
                 </>
