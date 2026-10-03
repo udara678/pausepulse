@@ -17,12 +17,16 @@ import {
   CheckCircle,
   Bookmark,
   X,
-  Utensils,
   Target,
   Sparkles,
   Zap,
+  Crown,
+  Lock,
+  ArrowUpRight,
+  ShieldAlert,
+  Download,
 } from 'lucide-react';
-import { UserStats, Settings, TimerMode, AppTheme } from './types';
+import { UserStats, Settings, TimerMode, AppTheme, UserPlan, PLAN_LIMITS } from './types';
 import { soundEngine } from './utils/audio';
 import { SettingsModal } from './components/SettingsModal';
 import { FocusCheckpointModal } from './components/FocusCheckpointModal';
@@ -30,9 +34,12 @@ import { HydrationCard } from './components/HydrationCard';
 import { GamificationPoints } from './components/GamificationPoints';
 import { AdminDashboard } from './components/AdminDashboard';
 import { LicenseGate } from './components/LicenseGate';
+import { UpgradeModal } from './components/UpgradeModal';
+import { DetailedAnalytics } from './components/DetailedAnalytics';
 
 const TRIAL_STARTED_KEY = 'pausepulse_trial_started';
 const LICENSE_KEY_STORE = 'pausepulse_license';
+const USER_PLAN_STORE = 'pausepulse_user_plan';
 
 const DEFAULT_SETTINGS: Settings = {
   hydrationIntervalMins: 60,
@@ -48,7 +55,7 @@ const DEFAULT_SETTINGS: Settings = {
   theme: 'dark',
 };
 
-type ActiveNavTab = 'TIMER' | 'HYDRATION' | 'MOOD' | 'BREATHING' | 'GAMES' | 'ACHIEVEMENTS' | 'ANALYTICS';
+type ActiveNavTab = 'TIMER' | 'HYDRATION' | 'MOOD' | 'BREATHING' | 'GAMES' | 'ANALYTICS' | 'ACHIEVEMENTS' | 'HR_PORTAL';
 
 interface MoodOption {
   id: string;
@@ -57,20 +64,30 @@ interface MoodOption {
   desc: string;
   recommended: string;
   durationSecs: number;
+  proOnly?: boolean;
 }
 
 const MOOD_DATA: MoodOption[] = [
-  { id: 'anxious', emoji: '😰', label: 'Anxious / Stressed', desc: 'High mental tension', recommended: '3-Phase Breathing (Inhale-Hold-Exhale)', durationSecs: 60 },
-  { id: 'tired', emoji: '🥱', label: 'Physically Tired', desc: 'Heavy eyes & fatigue', recommended: '60s Ergonomic Neck & Shoulder Stretch', durationSecs: 60 },
-  { id: 'blocked', emoji: '🤯', label: 'Mentally Blocked', desc: 'Stuck on problem', recommended: 'Look out window at a distant object for 2m', durationSecs: 120 },
-  { id: 'isolated', emoji: '🤝', label: 'Isolated / Distant', desc: 'Solo deep work gap', recommended: 'Pantry tea break or chat with a colleague', durationSecs: 120 },
-  { id: 'overloaded', emoji: '🌪️', label: 'Overwhelmed', desc: 'Too many tasks', recommended: 'Write top 1 tiny task and complete it first', durationSecs: 45 },
-  { id: 'bored', emoji: '😴', label: 'Bored / Lethargic', desc: 'Low motivation', recommended: 'Quick Stress Buster Bubble mini-game', durationSecs: 30 },
+  { id: 'anxious', emoji: '😰', label: 'Anxious / Stressed', desc: 'High mental tension', recommended: '3-Phase Breathing (Inhale-Hold-Exhale)', durationSecs: 60, proOnly: false },
+  { id: 'tired', emoji: '🥱', label: 'Physically Tired', desc: 'Heavy eyes & fatigue', recommended: '60s Ergonomic Neck & Shoulder Stretch', durationSecs: 60, proOnly: false },
+  { id: 'blocked', emoji: '🤯', label: 'Mentally Blocked', desc: 'Stuck on problem', recommended: 'Look out window at a distant object for 2m', durationSecs: 120, proOnly: true },
+  { id: 'isolated', emoji: '🤝', label: 'Isolated / Distant', desc: 'Solo deep work gap', recommended: 'Pantry tea break or chat with a colleague', durationSecs: 120, proOnly: true },
+  { id: 'overloaded', emoji: '🌪️', label: 'Overwhelmed', desc: 'Too many tasks', recommended: 'Write top 1 tiny task and complete it first', durationSecs: 45, proOnly: true },
+  { id: 'bored', emoji: '😴', label: 'Bored / Lethargic', desc: 'Low motivation', recommended: 'Quick Stress Buster Bubble mini-game', durationSecs: 30, proOnly: true },
 ];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveNavTab>('TIMER');
   const [licenseStatus, setLicenseStatus] = useState<'checking' | 'unlocked' | 'gate'>('checking');
+
+  // Plan State (Trial, Pro, or Team)
+  const [userPlan, setUserPlan] = useState<UserPlan>(() => {
+    return (localStorage.getItem(USER_PLAN_STORE) as UserPlan) || 'trial';
+  });
+
+  // Upgrade Modal State
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
+  const [upgradeTargetFeature, setUpgradeTargetFeature] = useState<string | undefined>(undefined);
 
   // Settings
   const [settings, setSettings] = useState<Settings>(() => {
@@ -123,6 +140,23 @@ export default function App() {
   const [isGuidedRunning, setIsGuidedRunning] = useState<boolean>(false);
   const [guidedCompleted, setGuidedCompleted] = useState<boolean>(false);
 
+  // Plan selection / upgrade handler
+  const handleSelectPlan = (newPlan: UserPlan) => {
+    setUserPlan(newPlan);
+    try {
+      localStorage.setItem(USER_PLAN_STORE, newPlan);
+    } catch {
+      // Ignore
+    }
+    setLevelUpToast(`Switched active plan to: ${newPlan.toUpperCase()}! 🚀`);
+    setTimeout(() => setLevelUpToast(null), 3000);
+  };
+
+  const openUpgradeModal = (feature?: string) => {
+    setUpgradeTargetFeature(feature);
+    setIsUpgradeModalOpen(true);
+  };
+
   // Check license / trial on startup
   useEffect(() => {
     const savedKey = localStorage.getItem(LICENSE_KEY_STORE);
@@ -141,7 +175,7 @@ export default function App() {
       }
     }
 
-    setLicenseStatus('unlocked'); // Default to unlocked in dev/local
+    setLicenseStatus('unlocked'); // Default unlocked
   }, []);
 
   // Sync settings target
@@ -353,11 +387,15 @@ export default function App() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Level info
+  // Level info based on tier gating
   const getLevelInfo = (pts: number) => {
-    if (pts < 500) return { name: 'Novice', level: 1, next: 500, percent: Math.round((pts / 500) * 100) };
+    if (pts < 500) return { name: 'Health Novice', level: 1, next: 500, percent: Math.round((pts / 500) * 100) };
     if (pts < 1500) return { name: 'Pacing Pro', level: 2, next: 1500, percent: Math.round((pts / 1500) * 100) };
-    if (pts < 3000) return { name: 'Pro', level: 3, next: 3000, percent: Math.round((pts / 3000) * 100) };
+    if (!PLAN_LIMITS[userPlan].allTiers) {
+      // Capped at Level 2 for Free Trial
+      return { name: 'Pacing Pro (Trial Max)', level: 2, next: 1500, percent: 100 };
+    }
+    if (pts < 3000) return { name: 'Pro Master', level: 3, next: 3000, percent: Math.round((pts / 3000) * 100) };
     return { name: 'Wellness Legend', level: 4, next: 5000, percent: 100 };
   };
 
@@ -397,7 +435,7 @@ export default function App() {
       }`}
     >
       {/* ═══════════════════════════════════════════════
-           TOP TITLE BAR (Mac Traffic Lights + Search + Controls)
+           TOP TITLE BAR (Mac Traffic Lights + Search + Plan Pill + Controls)
          ═══════════════════════════════════════════════ */}
       <header
         className={`titlebar-drag h-12 flex-shrink-0 flex items-center justify-between px-4 border-b transition-colors ${
@@ -450,11 +488,37 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right: Floating Focus Score + Actions */}
+        {/* Right: Plan Badge Pill + Focus Score + Actions */}
         <div className="flex items-center space-x-2 titlebar-nodrag">
+          {/* Plan Badge Pill (Click to open Upgrade Modal / Simulator) */}
+          <button
+            type="button"
+            onClick={() => openUpgradeModal()}
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+              userPlan === 'team'
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25'
+                : userPlan === 'pro'
+                ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/25'
+                : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25'
+            }`}
+            title="Click to view plan features or simulate tiers"
+          >
+            {userPlan === 'team' ? (
+              <Crown className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+            ) : userPlan === 'pro' ? (
+              <Zap className="w-3.5 h-3.5 fill-indigo-400 text-indigo-400" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+            )}
+            <span className="uppercase text-[10px] tracking-wider">
+              {userPlan === 'team' ? 'Team Plan' : userPlan === 'pro' ? 'Pro Monthly' : 'Free Trial'}
+            </span>
+            <ArrowUpRight className="w-3 h-3 opacity-60" />
+          </button>
+
           {/* Focus Score pill */}
           <div
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-xl border ${
+            className={`hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-xl border ${
               isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-100 border-slate-200'
             }`}
           >
@@ -513,18 +577,42 @@ export default function App() {
         >
           {/* Nav List */}
           <div className="space-y-1">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">
-              Dashboard
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2 flex items-center justify-between">
+              <span>Dashboard</span>
+              <span className="text-[9px] text-indigo-400 font-mono lowercase">
+                {userPlan} tier
+              </span>
             </div>
 
             {[
               { id: 'TIMER', icon: Clock, label: 'Focus Timer', badge: isRunning ? 'Live' : undefined },
               { id: 'HYDRATION', icon: Droplets, label: 'Hydration', badge: `${stats.waterIntakeMl}ml` },
-              { id: 'MOOD', icon: Smile, label: 'Mood Coach', badge: '6 Moods' },
+              {
+                id: 'MOOD',
+                icon: Smile,
+                label: 'Mood Coach',
+                badge: PLAN_LIMITS[userPlan].fullMoodCoach ? '6 Moods' : '2 Basic',
+              },
               { id: 'BREATHING', icon: Heart, label: 'Breathing', badge: '3-Phase' },
-              { id: 'GAMES', icon: Gamepad2, label: 'Stress Buster', badge: 'Mini Game' },
+              {
+                id: 'GAMES',
+                icon: Gamepad2,
+                label: 'Stress Buster',
+                badge: PLAN_LIMITS[userPlan].bubbleGame ? 'Mini Game' : '🔒 Pro',
+              },
+              {
+                id: 'ANALYTICS',
+                icon: BarChart3,
+                label: 'Personal Analytics',
+                badge: PLAN_LIMITS[userPlan].detailedAnalytics ? '7-Day' : '🔒 Pro',
+              },
               { id: 'ACHIEVEMENTS', icon: Trophy, label: 'Achievements', badge: `${stats.points} pts` },
-              { id: 'ANALYTICS', icon: BarChart3, label: 'Analytics & HR', badge: 'Team' },
+              {
+                id: 'HR_PORTAL',
+                icon: Crown,
+                label: 'Corporate HR',
+                badge: PLAN_LIMITS[userPlan].hrDashboard ? 'Team' : '🔒 Team',
+              },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -533,7 +621,7 @@ export default function App() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id as ActiveNavTab)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     isActive
                       ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-500/25 font-bold'
                       : isDark
@@ -548,7 +636,13 @@ export default function App() {
                   {tab.badge && (
                     <span
                       className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${
-                        isActive ? 'bg-white/20 text-white' : isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600'
+                        isActive
+                          ? 'bg-white/20 text-white'
+                          : tab.badge.includes('🔒')
+                          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
+                          : isDark
+                          ? 'bg-slate-800 text-slate-400'
+                          : 'bg-slate-200 text-slate-600'
                       }`}
                     >
                       {tab.badge}
@@ -568,7 +662,12 @@ export default function App() {
                   : 'bg-white border-slate-200 shadow-sm'
               }`}
             >
-              <div className="text-[10px] text-slate-400 font-semibold mb-1">Your Level</div>
+              <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold mb-1">
+                <span>Your Level</span>
+                {!PLAN_LIMITS[userPlan].allTiers && (
+                  <span className="text-[9px] text-amber-400 font-bold">Trial Cap Lvl 2</span>
+                )}
+              </div>
               <div className="flex items-center justify-between">
                 <div className="text-sm font-black text-indigo-400 flex items-center gap-1">
                   <Zap className="w-3.5 h-3.5 fill-indigo-400" />
@@ -600,7 +699,7 @@ export default function App() {
 
         {/* ── RIGHT MAIN VIEW ─────────────────────────── */}
         <main className="flex-1 overflow-y-auto p-6 transition-colors">
-          {/* TAB 1: FOCUS TIMER (Exact match to landing screenshot!) */}
+          {/* TAB 1: FOCUS TIMER */}
           {activeTab === 'TIMER' && (
             <div className="max-w-2xl mx-auto space-y-6">
               {/* Header Row */}
@@ -829,38 +928,74 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 3: MOOD COACH */}
+          {/* TAB 3: MOOD COACH (With Plan Gating) */}
           {activeTab === 'MOOD' && (
             <div className="max-w-2xl mx-auto space-y-4">
-              <div>
-                <h2 className="text-lg font-black tracking-tight">How are you feeling right now?</h2>
-                <p className="text-xs text-slate-400">Select your current mental/physical state for targeted micro-activities</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
+                    <span>How are you feeling right now?</span>
+                    {!PLAN_LIMITS[userPlan].fullMoodCoach && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                        Free Trial: 2 Moods Unlocked
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-xs text-slate-400">Select your current mental/physical state for targeted micro-activities</p>
+                </div>
+
+                {!PLAN_LIMITS[userPlan].fullMoodCoach && (
+                  <button
+                    type="button"
+                    onClick={() => openUpgradeModal('Full Mood Coach (All 6 Moods)')}
+                    className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Unlock all 6 Moods (Pro)</span>
+                  </button>
+                )}
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {MOOD_DATA.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedMood(m);
-                      setGuidedTimerSecs(m.durationSecs);
-                      setIsGuidedRunning(false);
-                      setGuidedCompleted(false);
-                    }}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                      selectedMood.id === m.id
-                        ? 'bg-indigo-600/30 border-indigo-500 shadow-md shadow-indigo-500/20'
-                        : isDark
-                        ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
-                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{m.emoji}</div>
-                    <div className="text-xs font-bold text-white">{m.label}</div>
-                    <div className="text-[10px] text-slate-400">{m.desc}</div>
-                  </button>
-                ))}
+                {MOOD_DATA.map((m) => {
+                  const isLockedMood = m.proOnly && !PLAN_LIMITS[userPlan].fullMoodCoach;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        if (isLockedMood) {
+                          openUpgradeModal(`Mood: ${m.label}`);
+                          return;
+                        }
+                        setSelectedMood(m);
+                        setGuidedTimerSecs(m.durationSecs);
+                        setIsGuidedRunning(false);
+                        setGuidedCompleted(false);
+                      }}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                        selectedMood.id === m.id && !isLockedMood
+                          ? 'bg-indigo-600/30 border-indigo-500 shadow-md shadow-indigo-500/20'
+                          : isLockedMood
+                          ? 'bg-slate-900/40 border-slate-800/80 opacity-70 hover:opacity-100 hover:border-indigo-500/50'
+                          : isDark
+                          ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {isLockedMood && (
+                        <div className="absolute top-2 right-2 text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                          <Lock className="w-2.5 h-2.5" />
+                          <span>Pro</span>
+                        </div>
+                      )}
+
+                      <div className="text-2xl mb-1">{m.emoji}</div>
+                      <div className="text-xs font-bold text-white">{m.label}</div>
+                      <div className="text-[10px] text-slate-400">{m.desc}</div>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Targeted Recommendation Box */}
@@ -983,61 +1118,93 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 5: STRESS BUSTER MINI GAME */}
+          {/* TAB 5: STRESS BUSTER MINI GAME (With Pro Plan Gating) */}
           {activeTab === 'GAMES' && (
-            <div className="max-w-md mx-auto space-y-4 py-4 text-center">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-black tracking-tight">Bubble Pop Stress Buster</h2>
-                  <p className="text-xs text-slate-400">Pop bubbles to relieve micro-stress & fatigue</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-bold text-amber-400 font-mono">Score: {gameScore} pts</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-3 p-4 rounded-2xl bg-slate-900 border border-slate-800">
-                {bubbles.map((b) => (
+            <div className="max-w-md mx-auto space-y-4 py-4 text-center relative">
+              {!PLAN_LIMITS[userPlan].bubbleGame ? (
+                <div className="p-8 rounded-3xl border border-indigo-500/30 bg-slate-900/90 text-center space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400">
+                    <Gamepad2 className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white">Stress Buster Game is a Pro Feature</h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Pop bubbles to alleviate micro-stress and earn +30 bonus wellness points every break.
+                    </p>
+                  </div>
                   <button
-                    key={b.id}
                     type="button"
-                    onClick={() => !b.popped && handlePopBubble(b.id)}
-                    className={`w-14 h-14 rounded-full transition-all duration-300 flex items-center justify-center text-sm font-bold shadow-md cursor-pointer ${
-                      b.popped ? 'scale-50 opacity-20 bg-slate-800 text-slate-600' : `${b.color} hover:scale-110 active:scale-90 text-white`
-                    }`}
+                    onClick={() => openUpgradeModal('Stress Buster Game')}
+                    className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-500/25 cursor-pointer active:scale-95 transition-all"
                   >
-                    {b.popped ? '💥' : '🎈'}
+                    Unlock Game with Pro ($4.99)
                   </button>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-black tracking-tight">Bubble Pop Stress Buster</h2>
+                      <p className="text-xs text-slate-400">Pop bubbles to relieve micro-stress & fatigue</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-bold text-amber-400 font-mono">Score: {gameScore} pts</span>
+                    </div>
+                  </div>
 
-              <div className="flex items-center justify-between pt-2">
-                <button
-                  type="button"
-                  onClick={resetBubbleGame}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
-                >
-                  Reset Grid
-                </button>
+                  <div className="grid grid-cols-4 gap-3 p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                    {bubbles.map((b) => (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() => !b.popped && handlePopBubble(b.id)}
+                        className={`w-14 h-14 rounded-full transition-all duration-300 flex items-center justify-center text-sm font-bold shadow-md cursor-pointer ${
+                          b.popped ? 'scale-50 opacity-20 bg-slate-800 text-slate-600' : `${b.color} hover:scale-110 active:scale-90 text-white`
+                        }`}
+                      >
+                        {b.popped ? '💥' : '🎈'}
+                      </button>
+                    ))}
+                  </div>
 
-                <button
-                  type="button"
-                  disabled={gameScore < 50}
-                  onClick={() => handleClaimBonus(30, 'Stress Buster Game')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    gameScore >= 50
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/30 cursor-pointer animate-pulse'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5 inline mr-1" />
-                  <span>Claim +30 Pts</span>
-                </button>
-              </div>
+                  <div className="flex items-center justify-between pt-2">
+                    <button
+                      type="button"
+                      onClick={resetBubbleGame}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+                    >
+                      Reset Grid
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={gameScore < 50}
+                      onClick={() => handleClaimBonus(30, 'Stress Buster Game')}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                        gameScore >= 50
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/30 cursor-pointer animate-pulse'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 inline mr-1" />
+                      <span>Claim +30 Pts</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
-          {/* TAB 6: ACHIEVEMENTS & GAMIFICATION */}
+          {/* TAB 6: PERSONAL ANALYTICS (7-Day charts and peak hours) */}
+          {activeTab === 'ANALYTICS' && (
+            <DetailedAnalytics
+              theme={settings.theme}
+              userPlan={userPlan}
+              onUpgradeClick={() => openUpgradeModal('7-Day Personal Analytics')}
+            />
+          )}
+
+          {/* TAB 7: ACHIEVEMENTS & GAMIFICATION */}
           {activeTab === 'ACHIEVEMENTS' && (
             <div className="max-w-xl mx-auto space-y-4">
               <GamificationPoints
@@ -1049,13 +1216,15 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 7: ANALYTICS & HR DASHBOARD */}
-          {activeTab === 'ANALYTICS' && (
+          {/* TAB 8: CORPORATE HR DASHBOARD & PORTAL */}
+          {activeTab === 'HR_PORTAL' && (
             <div className="space-y-4">
               <AdminDashboard
                 theme={settings.theme}
+                userPlan={userPlan}
                 onToggleTheme={handleToggleTheme}
                 onBackToApp={() => setActiveTab('TIMER')}
+                onUpgradeClick={() => openUpgradeModal('HR Corporate Portal & Seats')}
               />
             </div>
           )}
@@ -1063,7 +1232,7 @@ export default function App() {
       </div>
 
       {/* ═══════════════════════════════════════════════
-           MODALS (Settings & Checkpoints)
+           MODALS (Settings, Checkpoints & Upgrade Modal)
          ═══════════════════════════════════════════════ */}
       <SettingsModal
         isOpen={isSettingsOpen}
@@ -1077,6 +1246,15 @@ export default function App() {
         theme={settings.theme}
         onSaveCheckpoint={handleSaveCheckpoint}
         onSkip={startBreakSession}
+      />
+
+      <UpgradeModal
+        isOpen={isUpgradeModalOpen}
+        theme={settings.theme}
+        currentPlan={userPlan}
+        targetFeature={upgradeTargetFeature}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        onSelectPlan={handleSelectPlan}
       />
     </div>
   );

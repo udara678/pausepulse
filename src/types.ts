@@ -13,6 +13,47 @@ export interface UserStats {
 export type SoundTone = 'chime' | 'splash' | 'zen' | 'digital' | 'custom';
 export type AppTheme = 'dark' | 'light';
 export type TimerMode = 'FOCUS' | 'BREAK' | 'LUNCH';
+export type UserPlan = 'trial' | 'pro' | 'team';
+
+export interface PlanFeatureLimits {
+  customTimer: boolean;
+  fullMoodCoach: boolean;
+  allTiers: boolean;
+  detailedAnalytics: boolean;
+  bubbleGame: boolean;
+  hrDashboard: boolean;
+  exportReports: boolean;
+}
+
+export const PLAN_LIMITS: Record<UserPlan, PlanFeatureLimits> = {
+  trial: {
+    customTimer: false,
+    fullMoodCoach: false,
+    allTiers: false,
+    detailedAnalytics: false,
+    bubbleGame: false,
+    hrDashboard: false,
+    exportReports: false,
+  },
+  pro: {
+    customTimer: true,
+    fullMoodCoach: true,
+    allTiers: true,
+    detailedAnalytics: true,
+    bubbleGame: true,
+    hrDashboard: false,
+    exportReports: false,
+  },
+  team: {
+    customTimer: true,
+    fullMoodCoach: true,
+    allTiers: true,
+    detailedAnalytics: true,
+    bubbleGame: true,
+    hrDashboard: true,
+    exportReports: true,
+  },
+};
 
 export interface Settings {
   hydrationIntervalMins: number;

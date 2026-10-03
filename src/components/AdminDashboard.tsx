@@ -17,13 +17,17 @@ import {
   Lock,
   UserCheck,
   ShieldAlert,
+  Download,
+  FileSpreadsheet,
 } from 'lucide-react';
-import { AppTheme } from '../types';
+import { AppTheme, UserPlan } from '../types';
 
 interface AdminDashboardProps {
   theme: AppTheme;
+  userPlan?: UserPlan;
   onToggleTheme: () => void;
   onBackToApp: () => void;
+  onUpgradeClick?: () => void;
 }
 
 export interface RewardItem {
@@ -213,6 +217,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
     setEditingReward(null);
   };
 
+  const handleExportCSV = () => {
+    if (userPlan && userPlan !== 'team') {
+      showToast('Export CSV Reports is available on the Pro Yearly & Team Plan.');
+      onUpgradeClick?.();
+      return;
+    }
+
+    if (!data) return;
+
+    // Generate CSV content
+    const headers = 'Date,Company Name,Active Seats,Total Seats,Wellness Compliance,Avg Hydration (ml),Total Breaks This Month\n';
+    const row = `${new Date().toISOString().split('T')[0]},"${data.companyName}",${data.activeSeats},${data.totalSeats},${data.teamWellnessScore}%,${data.monthlyHydrationAvgMl},${data.anonymizedStats.totalBreaksCompletedThisMonth}\n`;
+
+    const blob = new Blob([headers + row], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `pausepulse-wellness-report-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast('Downloaded pausepulse-wellness-report.csv! 📄');
+  };
+
   return (
     <div
       className={`w-full h-screen flex flex-col font-['Inter',sans-serif] overflow-y-auto p-4 transition-colors duration-300 ${
@@ -287,6 +316,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
               <span>Employee View</span>
             </button>
           </div>
+
+          {/* Export CSV Report Button */}
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className={`p-2 rounded-xl border flex items-center space-x-1.5 text-xs font-bold transition-all cursor-pointer ${
+              userPlan === 'team'
+                ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-600/30'
+                : isDark
+                ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
+            }`}
+            title={userPlan === 'team' ? 'Export CSV Wellness Report' : 'Export CSV (Team Plan Feature)'}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export CSV</span>
+            {userPlan && userPlan !== 'team' && (
+              <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-400 font-bold ml-1">
+                🔒 Team
+              </span>
+            )}
+          </button>
 
           {/* Sun/Moon Theme Toggle */}
           <button
