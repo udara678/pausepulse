@@ -122,7 +122,7 @@ export default function App() {
   // Timer states
   const [mode, setMode] = useState<TimerMode>('FOCUS');
   const [timeLeft, setTimeLeft] = useState<number>(settings.breakIntervalMins * 60);
-  const [isRunning, setIsRunning] = useState<boolean>(true);
+  const [isRunning, setIsRunning] = useState<boolean>(false);
   const [breakCompleted, setBreakCompleted] = useState<boolean>(false);
   const [breakClaimed, setBreakClaimed] = useState<boolean>(false);
 
@@ -316,6 +316,10 @@ export default function App() {
   const handleStartLunchBreak = () => {
     setMode('LUNCH');
     setTimeLeft((settings.lunchBreakMins || 45) * 60);
+    setIsRunning(false); // paused — user must press Start Lunch Break
+  };
+
+  const startLunchTimer = () => {
     setIsRunning(true);
     if (settings.soundEnabled) soundEngine.playTone('chime');
     window.electronAPI?.sendNotification(
@@ -327,13 +331,8 @@ export default function App() {
   const startFocusSession = () => {
     setMode('FOCUS');
     setTimeLeft(settings.breakIntervalMins * 60);
-    setIsRunning(true);
+    setIsRunning(false); // paused — user must press Start Focus
     if (stats.lastCheckpointNote) setShowWelcomeBackBanner(true);
-    if (settings.soundEnabled) soundEngine.playTone(settings.selectedTone, settings.customSoundUrl);
-    window.electronAPI?.sendNotification(
-      'Back to Focus Session! ⚡',
-      'Welcome back to your deep work session.'
-    );
   };
 
   const handleSaveCheckpoint = (note: string) => {
@@ -372,7 +371,7 @@ export default function App() {
     }
     setMode('FOCUS');
     setTimeLeft(newSettings.breakIntervalMins * 60);
-    setIsRunning(true);
+    setIsRunning(false); // paused after settings change
   };
 
   const handleToggleTheme = () => {
@@ -857,8 +856,37 @@ export default function App() {
 
                 {/* Main Action Controls */}
                 <div className="flex items-center space-x-3 flex-wrap gap-y-2">
-                  {/* Show Start Break button when break is ready but not yet running */}
-                  {mode === 'BREAK' && !isRunning && !breakCompleted ? (
+
+                  {/* ── FOCUS: Start button when not yet running ── */}
+                  {mode === 'FOCUS' && !isRunning && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRunning(true);
+                        if (settings.soundEnabled) soundEngine.playTone(settings.selectedTone, settings.customSoundUrl);
+                        window.electronAPI?.sendNotification('Focus Session Started! ⚡', 'Deep work mode active. Stay focused!');
+                      }}
+                      className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
+                    >
+                      <Play className="w-4 h-4 fill-white" />
+                      <span>Start Focus ({settings.breakIntervalMins}m)</span>
+                    </button>
+                  )}
+
+                  {/* ── FOCUS: Pause button when running ── */}
+                  {mode === 'FOCUS' && isRunning && (
+                    <button
+                      type="button"
+                      onClick={() => setIsRunning(false)}
+                      className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
+                    >
+                      <Pause className="w-4 h-4" />
+                      <span>Pause</span>
+                    </button>
+                  )}
+
+                  {/* ── BREAK: Start button when not yet running ── */}
+                  {mode === 'BREAK' && !isRunning && !breakCompleted && (
                     <button
                       type="button"
                       onClick={startBreakTimer}
@@ -867,19 +895,57 @@ export default function App() {
                       <Play className="w-4 h-4 fill-white" />
                       <span>Start Break ({settings.breakDurationMins || 3}m)</span>
                     </button>
-                  ) : mode !== 'BREAK' || (mode === 'BREAK' && isRunning) ? (
-                    /* Normal Pause/Resume — shown for FOCUS, LUNCH, and active BREAK */
+                  )}
+
+                  {/* ── BREAK: Pause/Resume when running ── */}
+                  {mode === 'BREAK' && isRunning && (
                     <button
                       type="button"
-                      onClick={() => setIsRunning(!isRunning)}
-                      className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
+                      onClick={() => setIsRunning(false)}
+                      className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
                     >
-                      {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}
-                      <span>{isRunning ? 'Pause' : 'Resume'}</span>
+                      <Pause className="w-4 h-4" />
+                      <span>Pause Break</span>
                     </button>
-                  ) : null}
+                  )}
 
-                  {/* Reset — always visible */}
+                  {/* ── LUNCH: Start button when not yet running ── */}
+                  {mode === 'LUNCH' && !isRunning && (
+                    <button
+                      type="button"
+                      onClick={startLunchTimer}
+                      className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
+                    >
+                      <Play className="w-4 h-4 fill-white" />
+                      <span>Start Lunch ({settings.lunchBreakMins || 45}m) 🍱</span>
+                    </button>
+                  )}
+
+                  {/* ── LUNCH: Pause/Resume when running ── */}
+                  {mode === 'LUNCH' && isRunning && (
+                    <button
+                      type="button"
+                      onClick={() => setIsRunning(false)}
+                      className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
+                    >
+                      <Pause className="w-4 h-4" />
+                      <span>Pause Lunch</span>
+                    </button>
+                  )}
+
+                  {/* ── Resume button when paused mid-session (not at start) ── */}
+                  {!isRunning && mode === 'FOCUS' && timeLeft < settings.breakIntervalMins * 60 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsRunning(true)}
+                      className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
+                    >
+                      <Play className="w-4 h-4 fill-white" />
+                      <span>Resume</span>
+                    </button>
+                  )}
+
+                  {/* ── Reset ── */}
                   <button
                     type="button"
                     onClick={() => {
@@ -902,7 +968,7 @@ export default function App() {
                     <span>Reset</span>
                   </button>
 
-                  {/* Claim Break — only when break timer fully complete, one-time */}
+                  {/* ── Claim Break (locked until complete, one-time) ── */}
                   {mode === 'BREAK' && (
                     <button
                       type="button"
@@ -924,16 +990,12 @@ export default function App() {
                     >
                       <CheckCircle className="w-4 h-4" />
                       <span>
-                        {breakClaimed
-                          ? 'Claimed ✓'
-                          : breakCompleted
-                          ? 'Claim Break (+50 pts)'
-                          : '🔒 Complete break to claim'}
+                        {breakClaimed ? 'Claimed ✓' : breakCompleted ? 'Claim Break (+50 pts)' : '🔒 Complete break to claim'}
                       </span>
                     </button>
                   )}
 
-                  {/* Back to Focus — shown after break is claimed */}
+                  {/* ── Back to Focus (after break claimed) ── */}
                   {mode === 'BREAK' && breakClaimed && (
                     <button
                       type="button"
@@ -945,8 +1007,8 @@ export default function App() {
                     </button>
                   )}
 
-                  {/* Checkpoint — only during Focus */}
-                  {mode === 'FOCUS' && (
+                  {/* ── Checkpoint (Focus only) ── */}
+                  {mode === 'FOCUS' && isRunning && (
                     <button
                       type="button"
                       onClick={() => setIsCheckpointOpen(true)}
