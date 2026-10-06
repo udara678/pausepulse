@@ -25,11 +25,29 @@ function createWindow() {
     },
   });
 
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show();
+    mainWindow?.focus();
+  });
+
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL('http://localhost:5173').catch(() => {
+      // If vite is still starting, retry after 1s
+      setTimeout(() => {
+        mainWindow?.loadURL('http://localhost:5173');
+      }, 1500);
+    });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
+
+  // Fallback to guarantee window appears
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }, 1000);
 
   mainWindow.on('blur', () => {
     // Keep window open during dev, can auto-hide in production tray mode
