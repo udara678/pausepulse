@@ -58,6 +58,58 @@ const DEFAULT_SETTINGS: Settings = {
 
 type ActiveNavTab = 'TIMER' | 'HYDRATION' | 'MOOD' | 'BREATHING' | 'GAMES' | 'ANALYTICS' | 'ACHIEVEMENTS' | 'HR_PORTAL';
 
+interface TabErrorBoundaryProps {
+  children: React.ReactNode;
+  onReset: () => void;
+}
+
+interface TabErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class TabErrorBoundary extends React.Component<TabErrorBoundaryProps, TabErrorBoundaryState> {
+  constructor(props: TabErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): TabErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Tab render error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 max-w-md mx-auto my-12 rounded-3xl border border-rose-500/30 bg-purple-950/40 backdrop-blur-xl text-center space-y-4 shadow-2xl">
+          <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto text-xl font-bold">
+            ⚠️
+          </div>
+          <h3 className="text-base font-bold text-white">Temporary Render Error</h3>
+          <p className="text-xs text-rose-300/80 font-mono">
+            {this.state.error?.message || 'Component failed to mount'}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              this.setState({ hasError: false });
+              this.props.onReset();
+            }}
+            className="px-5 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold shadow-lg shadow-violet-500/25 cursor-pointer"
+          >
+            Return to Focus Timer
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 interface MoodOption {
   id: string;
   emoji: string;
@@ -732,8 +784,9 @@ export default function App() {
 
         {/* ── RIGHT MAIN VIEW ─────────────────────────── */}
         <main className="flex-1 overflow-y-auto p-6 transition-colors bg-transparent">
-          {/* TAB 1: FOCUS TIMER */}
-          {activeTab === 'TIMER' && (
+          <TabErrorBoundary onReset={() => setActiveTab('TIMER')}>
+            {/* TAB 1: FOCUS TIMER */}
+            {activeTab === 'TIMER' && (
             <div className="max-w-2xl mx-auto space-y-6">
               {/* Header Row */}
               <div className="flex items-center justify-between">
@@ -1419,6 +1472,7 @@ export default function App() {
               />
             </div>
           )}
+          </TabErrorBoundary>
         </main>
       </div>
 

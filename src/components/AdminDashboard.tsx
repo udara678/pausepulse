@@ -53,7 +53,13 @@ interface HRData {
 
 const REWARDS_CACHE_KEY = 'pausepulse_hr_rewards_cache';
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleTheme, onBackToApp }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({
+  theme,
+  userPlan = 'trial',
+  onToggleTheme,
+  onBackToApp,
+  onUpgradeClick,
+}) => {
   const isDark = theme === 'dark';
   const [data, setData] = useState<HRData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -244,8 +250,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ theme, onToggleT
 
   return (
     <div
-      className={`w-full h-screen flex flex-col font-['Inter',sans-serif] overflow-y-auto p-4 transition-colors duration-300 ${
-        isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
+      className={`w-full flex flex-col font-['Inter',sans-serif] space-y-4 transition-colors duration-300 ${
+        isDark ? 'text-slate-100' : 'text-slate-900'
       }`}
     >
       {/* ── Top Header Navigation ────────────────────── */}
