@@ -23,8 +23,27 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.glass-lavender {
+  background: rgba(46, 16, 101, 0.25);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(233, 213, 255, 0.18);
+  box-shadow: 0 8px 32px 0 rgba(88, 28, 135, 0.25);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(233, 213, 255, 0.2);
+}
+
 .glow-indigo {
   box-shadow: 0 0 40px -10px rgba(99, 102, 241, 0.35);
+}
+
+.glow-lavender {
+  box-shadow: 0 0 50px -5px rgba(192, 132, 252, 0.35);
 }
 
 /* Custom scrollbars */

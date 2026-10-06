@@ -36,6 +36,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { LicenseGate } from './components/LicenseGate';
 import { UpgradeModal } from './components/UpgradeModal';
 import { DetailedAnalytics } from './components/DetailedAnalytics';
+import { Glass3DBackground } from './components/Glass3DBackground';
 
 const TRIAL_STARTED_KEY = 'pausepulse_trial_started';
 const LICENSE_KEY_STORE = 'pausepulse_license';
@@ -452,18 +453,26 @@ export default function App() {
 
   return (
     <div
-      className={`w-full h-screen flex flex-col font-['Inter',sans-serif] overflow-hidden select-none transition-colors duration-300 ${
-        isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
+      className={`relative w-full h-screen flex flex-col font-['Inter',sans-serif] overflow-hidden select-none transition-colors duration-300 ${
+        isDark ? 'text-slate-100' : 'text-slate-900'
       }`}
     >
+      {/* ═══════════════════════════════════════════════
+           3D GLASS ETHEREAL BACKGROUND (Three.js)
+         ═══════════════════════════════════════════════ */}
+      <Glass3DBackground
+        breathPhase={breathPhase}
+        isBreathingActive={isBreathingActive}
+        theme={settings.theme}
+      />
       {/* ═══════════════════════════════════════════════
            TOP TITLE BAR (Mac Traffic Lights + Search + Plan Pill + Controls)
          ═══════════════════════════════════════════════ */}
       <header
-        className={`titlebar-drag h-12 flex-shrink-0 flex items-center justify-between px-4 border-b transition-colors ${
+        className={`titlebar-drag relative z-10 h-12 flex-shrink-0 flex items-center justify-between px-4 border-b transition-colors ${
           isDark
-            ? 'bg-slate-900/90 border-slate-800/80 backdrop-blur-md'
-            : 'bg-white/95 border-slate-200/80 shadow-xs'
+            ? 'bg-purple-950/40 border-purple-500/20 backdrop-blur-2xl'
+            : 'bg-purple-50/70 border-purple-200/60 backdrop-blur-xl shadow-sm'
         }`}
       >
         {/* Left: Window Control Dots */}
@@ -590,11 +599,13 @@ export default function App() {
       {/* ═══════════════════════════════════════════════
            MAIN BODY: Left Sidebar + Right Content Area
          ═══════════════════════════════════════════════ */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="relative z-10 flex-1 flex overflow-hidden">
         {/* ── LEFT SIDEBAR ────────────────────────────── */}
         <aside
           className={`w-60 flex-shrink-0 flex flex-col justify-between p-3.5 border-r transition-colors ${
-            isDark ? 'bg-slate-900/60 border-slate-800/80' : 'bg-slate-100/80 border-slate-200'
+            isDark
+              ? 'bg-purple-950/35 border-purple-500/20 backdrop-blur-2xl'
+              : 'bg-white/60 border-purple-200/50 backdrop-blur-xl'
           }`}
         >
           {/* Nav List */}
@@ -645,14 +656,14 @@ export default function App() {
                   onClick={() => setActiveTab(tab.id as ActiveNavTab)}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-500/25 font-bold'
+                      ? 'bg-gradient-to-r from-violet-600 to-purple-500 text-white shadow-md shadow-violet-500/30 font-bold'
                       : isDark
-                      ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+                      ? 'text-purple-200/70 hover:text-white hover:bg-purple-500/20'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-purple-100/60'
                   }`}
                 >
                   <div className="flex items-center space-x-2.5">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : isDark ? 'text-purple-300/60' : 'text-slate-400'}`} />
                     <span>{tab.label}</span>
                   </div>
                   {tab.badge && (
@@ -663,7 +674,7 @@ export default function App() {
                           : tab.badge.includes('🔒')
                           ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
                           : isDark
-                          ? 'bg-slate-800 text-slate-400'
+                          ? 'bg-purple-900/50 text-purple-300'
                           : 'bg-slate-200 text-slate-600'
                       }`}
                     >
@@ -675,13 +686,13 @@ export default function App() {
             })}
           </div>
 
-          {/* Bottom Card: Your Level Card (Exact match to Mockup!) */}
-          <div className="space-y-2 pt-3 border-t border-slate-800/50">
+          {/* Bottom Card: Your Level Card */}
+          <div className="space-y-2 pt-3 border-t border-purple-500/20">
             <div
               className={`p-3 rounded-2xl border transition-all ${
                 isDark
-                  ? 'bg-gradient-to-br from-indigo-950/40 to-cyan-950/30 border-indigo-500/30 shadow-sm'
-                  : 'bg-white border-slate-200 shadow-sm'
+                  ? 'bg-purple-950/40 border-purple-500/25 shadow-sm backdrop-blur-sm'
+                  : 'bg-white/70 border-purple-200/50 shadow-sm backdrop-blur-sm'
               }`}
             >
               <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold mb-1">
@@ -720,7 +731,7 @@ export default function App() {
         </aside>
 
         {/* ── RIGHT MAIN VIEW ─────────────────────────── */}
-        <main className="flex-1 overflow-y-auto p-6 transition-colors">
+        <main className="flex-1 overflow-y-auto p-6 transition-colors bg-transparent">
           {/* TAB 1: FOCUS TIMER */}
           {activeTab === 'TIMER' && (
             <div className="max-w-2xl mx-auto space-y-6">
@@ -808,20 +819,31 @@ export default function App() {
               <div className="flex flex-col items-center justify-center py-6">
                 <div className="relative inline-flex items-center justify-center mb-6">
                   <svg width="220" height="220" viewBox="0 0 160 160" className="transform -rotate-90">
+                    {/* Outer glow ring */}
+                    <circle
+                      cx="80"
+                      cy="80"
+                      r={circleRadius + 4}
+                      fill="none"
+                      stroke={isDark ? 'rgba(168,85,247,0.08)' : 'rgba(168,85,247,0.12)'}
+                      strokeWidth="2"
+                    />
+                    {/* Track ring */}
                     <circle
                       cx="80"
                       cy="80"
                       r={circleRadius}
                       fill="none"
-                      stroke={isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.2)'}
+                      stroke={isDark ? 'rgba(168,85,247,0.15)' : 'rgba(139,92,246,0.15)'}
                       strokeWidth="8"
                     />
+                    {/* Progress arc */}
                     <circle
                       cx="80"
                       cy="80"
                       r={circleRadius}
                       fill="none"
-                      stroke="url(#timerGrad)"
+                      stroke="url(#timerGradLavender)"
                       strokeWidth="8"
                       strokeLinecap="round"
                       strokeDasharray={circumference}
@@ -829,18 +851,19 @@ export default function App() {
                       className="transition-all duration-1000 ease-linear"
                     />
                     <defs>
-                      <linearGradient id="timerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#6366f1" />
-                        <stop offset="100%" stopColor="#22d3ee" />
+                      <linearGradient id="timerGradLavender" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#a855f7" />
+                        <stop offset="60%" stopColor="#c084fc" />
+                        <stop offset="100%" stopColor="#e879f9" />
                       </linearGradient>
                     </defs>
                   </svg>
 
-                  <div className="absolute text-center">
-                    <div className={`text-4xl font-black font-mono tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <div className="absolute text-center px-4 py-2 rounded-2xl bg-purple-950/30 backdrop-blur-sm border border-purple-400/15">
+                    <div className="text-4xl font-black font-mono tracking-tight text-white drop-shadow-lg">
                       {formatTime(timeLeft)}
                     </div>
-                    <div className="text-xs text-slate-400 font-semibold tracking-wider uppercase mt-1">
+                    <div className="text-[10px] text-purple-300/80 font-semibold tracking-wider uppercase mt-1">
                       {mode === 'FOCUS'
                         ? 'remaining'
                         : mode === 'LUNCH'
