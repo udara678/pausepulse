@@ -255,34 +255,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }`}
     >
       {/* ── Top Header Navigation ────────────────────── */}
-      <div className={`flex items-center justify-between pb-4 border-b mb-4 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-        <div className="flex items-center space-x-3">
+      <div className={`flex flex-wrap items-center justify-between gap-3 pb-4 border-b mb-4 ${isDark ? 'border-purple-500/20' : 'border-purple-200'}`}>
+        <div className="flex items-center space-x-3 min-w-0">
           <button
             type="button"
             onClick={onBackToApp}
-            className={`p-2 rounded-xl border flex items-center space-x-1.5 text-xs font-semibold transition-all cursor-pointer ${
+            className={`p-2 rounded-xl border flex items-center space-x-1.5 text-xs font-semibold transition-all cursor-pointer shrink-0 ${
               isDark
                 ? 'bg-slate-900 border-slate-800 hover:bg-slate-800 text-slate-300'
-                : 'bg-white border-slate-300 hover:bg-slate-100 text-slate-700 shadow-sm'
+                : 'bg-white border-slate-300 hover:bg-slate-100 text-slate-800 shadow-sm'
             }`}
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to App</span>
           </button>
-          <div>
-            <h1 className="text-base font-extrabold tracking-tight flex items-center gap-2">
+          <div className="min-w-0">
+            <h1 className="text-base font-extrabold tracking-tight whitespace-nowrap truncate">
               HR & Corporate Wellness Portal
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-500 font-semibold border border-emerald-500/30">
-                LIVE API CONNECTED
-              </span>
             </h1>
-            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
               Anonymized Team Analytics & Reward Challenges
             </p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* 👑 Role Permission Switcher (HR Admin vs Employee View) */}
           <div className={`p-1 rounded-xl border flex space-x-1 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-200 border-slate-300'}`}>
             <button

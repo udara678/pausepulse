@@ -120,7 +120,7 @@ export const BreakTimerCard: React.FC<BreakTimerCardProps> = ({
           >
             <div className="flex items-center space-x-1.5">
               <Heart className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-              <span className="text-xs font-extrabold">Guided Box Breathing & Stress Game</span>
+              <span className="text-xs font-extrabold">3-Phase Breathing & Stress Game</span>
             </div>
             <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
               +30 Bonus Pts
@@ -171,7 +171,7 @@ export const BreakTimerCard: React.FC<BreakTimerCardProps> = ({
               title={`Start dedicated ${lunchBreakMins}-min lunch break`}
             >
               <Utensils className="w-3.5 h-3.5" />
-              <span>🍱 Lunch ({lunchBreakMins}m)</span>
+              <span>Lunch ({lunchBreakMins}m)</span>
             </button>
           )}
         </div>

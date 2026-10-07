@@ -25,8 +25,9 @@ import {
   ArrowUpRight,
   ShieldAlert,
   Download,
+  Utensils,
 } from 'lucide-react';
-import { UserStats, Settings, TimerMode, AppTheme, UserPlan, PLAN_LIMITS } from './types';
+import { UserStats, Settings, TimerMode, AppTheme, UserPlan, PLAN_LIMITS, AllTimersState, ModeTimerState } from './types';
 import { soundEngine } from './utils/audio';
 import { SettingsModal } from './components/SettingsModal';
 import { FocusCheckpointModal } from './components/FocusCheckpointModal';
@@ -36,13 +37,13 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { LicenseGate } from './components/LicenseGate';
 import { UpgradeModal } from './components/UpgradeModal';
 import { DetailedAnalytics } from './components/DetailedAnalytics';
-import { Glass3DBackground } from './components/Glass3DBackground';
 import { GlobeCollection } from '@designcodeio/threeui';
 import '@designcodeio/threeui/style.css';
 
 const TRIAL_STARTED_KEY = 'pausepulse_trial_started';
 const LICENSE_KEY_STORE = 'pausepulse_license';
 const USER_PLAN_STORE = 'pausepulse_user_plan';
+const TIMERS_STORAGE_KEY = 'pausepulse_independent_timers_v1';
 
 const DEFAULT_SETTINGS: Settings = {
   hydrationIntervalMins: 60,
@@ -56,7 +57,68 @@ const DEFAULT_SETTINGS: Settings = {
   waterTargetMl: 2000,
   selectedTone: 'chime',
   theme: 'dark',
+  reduceMotion: false,
 };
+
+function getInitialTimers(settings: Settings): AllTimersState {
+  const defaults: AllTimersState = {
+    FOCUS: {
+      durationSec: settings.breakIntervalMins * 60,
+      endTimestamp: null,
+      remainingSec: settings.breakIntervalMins * 60,
+      status: 'idle',
+    },
+    BREAK: {
+      durationSec: (settings.breakDurationMins || 3) * 60,
+      endTimestamp: null,
+      remainingSec: (settings.breakDurationMins || 3) * 60,
+      status: 'idle',
+    },
+    LUNCH: {
+      durationSec: (settings.lunchBreakMins || 45) * 60,
+      endTimestamp: null,
+      remainingSec: (settings.lunchBreakMins || 45) * 60,
+      status: 'idle',
+    },
+  };
+
+  try {
+    const saved = localStorage.getItem(TIMERS_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved) as AllTimersState;
+      const now = Date.now();
+      (['FOCUS', 'BREAK', 'LUNCH'] as TimerMode[]).forEach((m) => {
+        if (parsed[m]) {
+          let rem = parsed[m].remainingSec;
+          let stat = parsed[m].status;
+          let endT = parsed[m].endTimestamp;
+
+          if (stat === 'running' && endT) {
+            const diff = Math.ceil((endT - now) / 1000);
+            if (diff > 0) {
+              rem = diff;
+            } else {
+              rem = 0;
+              stat = 'idle';
+              endT = null;
+            }
+          }
+
+          defaults[m] = {
+            durationSec: parsed[m].durationSec || defaults[m].durationSec,
+            endTimestamp: endT ?? null,
+            remainingSec: typeof rem === 'number' ? rem : defaults[m].durationSec,
+            status: stat || 'idle',
+          };
+        }
+      });
+    }
+  } catch (e) {
+    console.error('Failed to parse saved timers:', e);
+  }
+
+  return defaults;
+}
 
 type ActiveNavTab = 'TIMER' | 'HYDRATION' | 'MOOD' | 'BREATHING' | 'GAMES' | 'ANALYTICS' | 'ACHIEVEMENTS' | 'HR_PORTAL';
 
@@ -174,12 +236,15 @@ export default function App() {
     };
   });
 
-  // Timer states
-  const [mode, setMode] = useState<TimerMode>('FOCUS');
-  const [timeLeft, setTimeLeft] = useState<number>(settings.breakIntervalMins * 60);
-  const [isRunning, setIsRunning] = useState<boolean>(false);
+  // Independent timers state for each mode: { durationSec, endTimestamp, remainingSec, status }
+  const [timers, setTimers] = useState<AllTimersState>(() => getInitialTimers(settings));
+  const [displayedMode, setDisplayedMode] = useState<TimerMode>('FOCUS');
   const [breakCompleted, setBreakCompleted] = useState<boolean>(false);
   const [breakClaimed, setBreakClaimed] = useState<boolean>(false);
+  const [confirmSwitch, setConfirmSwitch] = useState<{
+    currentMode: TimerMode;
+    newMode: TimerMode;
+  } | null>(null);
 
   // Breathing Interactive state machine (3-Phase: 4s Inhale -> 4s Hold -> 4s Exhale)
   const [breathPhase, setBreathPhase] = useState<'INHALE' | 'HOLD' | 'EXHALE'>('INHALE');
@@ -245,43 +310,232 @@ export default function App() {
     setStats((prev) => ({ ...prev, waterTargetMl: settings.waterTargetMl }));
   }, [settings.waterTargetMl]);
 
-  // Main countdown timer
+  // Live timer tick: computes remaining time from Date.now() and endTimestamp
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    const interval = setInterval(() => {
+      const runningMode = (['FOCUS', 'BREAK', 'LUNCH'] as TimerMode[]).find(
+        (m) => timers[m].status === 'running' && timers[m].endTimestamp !== null
+      );
 
-    if (isRunning && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0) {
-      if (mode === 'FOCUS') {
-        setIsCheckpointOpen(true);
-        setIsRunning(false);
-        if (settings.soundEnabled) {
-          soundEngine.playTone(settings.selectedTone, settings.customSoundUrl);
-        }
-      } else if (mode === 'LUNCH') {
-        startFocusSession();
-        window.electronAPI?.sendNotification(
-          'Lunch Break Finished! 🍱',
-          'Hope you had a great meal! Welcome back to your focus session.'
-        );
-      } else if (mode === 'BREAK') {
-        // Break complete — stop timer, unlock Claim button
-        setIsRunning(false);
-        setBreakCompleted(true);
-        if (settings.soundEnabled) soundEngine.playTone('zen');
-        window.electronAPI?.sendNotification(
-          'Break Complete! 🎉',
-          'Great rest! Claim your +50 pts and return to focus when ready.'
-        );
+      if (!runningMode) return;
+
+      const now = Date.now();
+      const currentTimer = timers[runningMode];
+      if (!currentTimer.endTimestamp) return;
+
+      const remaining = Math.max(0, Math.ceil((currentTimer.endTimestamp - now) / 1000));
+
+      if (remaining <= 0) {
+        handleTimerCompleted(runningMode);
+      } else if (remaining !== currentTimer.remainingSec) {
+        setTimers((prev) => {
+          const next = {
+            ...prev,
+            [runningMode]: {
+              ...prev[runningMode],
+              remainingSec: remaining,
+            },
+          };
+          try {
+            localStorage.setItem(TIMERS_STORAGE_KEY, JSON.stringify(next));
+          } catch {}
+          return next;
+        });
       }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [timers]);
+
+  const handleTimerCompleted = (completedMode: TimerMode) => {
+    soundEngine.playTone(settings.selectedTone, settings.customSoundUrl);
+
+    setTimers((prev) => {
+      const next: AllTimersState = {
+        ...prev,
+        [completedMode]: {
+          ...prev[completedMode],
+          status: 'idle',
+          endTimestamp: null,
+          remainingSec: 0,
+        },
+      };
+      try {
+        localStorage.setItem(TIMERS_STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    if (completedMode === 'FOCUS') {
+      setIsCheckpointOpen(true);
+      window.electronAPI?.sendNotification?.('Focus Session Complete! 🎯', 'Great job! Time for a well-deserved break.');
+      setStats((prev) => ({
+        ...prev,
+        points: prev.points + 25,
+        activeMinutes: prev.activeMinutes + Math.round(timers.FOCUS.durationSec / 60),
+      }));
+    } else if (completedMode === 'BREAK') {
+      setBreakCompleted(true);
+      window.electronAPI?.sendNotification?.('Break Finished! 🎉', 'Ready to dive back into focused work?');
+      setStats((prev) => ({
+        ...prev,
+        breaksCompleted: prev.breaksCompleted + 1,
+      }));
+    } else if (completedMode === 'LUNCH') {
+      window.electronAPI?.sendNotification?.('Lunch Break Finished! 🍽️', 'Hope you had a great meal! Welcome back.');
+    }
+  };
+
+  const startModeDirectly = (modeToStart: TimerMode) => {
+    const now = Date.now();
+    setTimers((prev) => {
+      const target = prev[modeToStart];
+      const remaining = target.remainingSec > 0 ? target.remainingSec : target.durationSec;
+      const endTimestamp = now + remaining * 1000;
+
+      const next: AllTimersState = {
+        ...prev,
+        [modeToStart]: {
+          ...target,
+          status: 'running',
+          remainingSec: remaining,
+          endTimestamp,
+        },
+      };
+      try {
+        localStorage.setItem(TIMERS_STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    if (modeToStart === 'FOCUS') {
+      soundEngine.playTone(settings.selectedTone, settings.customSoundUrl);
+      window.electronAPI?.sendNotification?.('Focus Session Started! ⚡', 'Deep work mode active. Stay focused!');
+      if (stats.lastCheckpointNote) setShowWelcomeBackBanner(true);
+    } else if (modeToStart === 'BREAK') {
+      soundEngine.playTone(settings.selectedTone, settings.customSoundUrl);
+      window.electronAPI?.sendNotification?.('Break Time Started! 🧘', `Take a ${Math.round(timers.BREAK.durationSec / 60)}-minute break now!`);
+      setBreakCompleted(false);
+      setBreakClaimed(false);
+    } else if (modeToStart === 'LUNCH') {
+      soundEngine.playTone(settings.selectedTone, settings.customSoundUrl);
+      window.electronAPI?.sendNotification?.('Lunch Break Started 🍽️', `Enjoy your ${Math.round(timers.LUNCH.durationSec / 60)}-minute meal break!`);
+    }
+  };
+
+  const handleStartTimer = (modeToStart: TimerMode) => {
+    // If another mode is currently running, prompt confirmation dialog
+    const currentlyRunning = (['FOCUS', 'BREAK', 'LUNCH'] as TimerMode[]).find(
+      (m) => m !== modeToStart && timers[m].status === 'running'
+    );
+
+    if (currentlyRunning) {
+      setConfirmSwitch({
+        currentMode: currentlyRunning,
+        newMode: modeToStart,
+      });
+      return;
     }
 
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isRunning, timeLeft, mode, settings]);
+    startModeDirectly(modeToStart);
+  };
+
+  const handleConfirmSwitch = () => {
+    if (!confirmSwitch) return;
+    const { currentMode, newMode } = confirmSwitch;
+    const now = Date.now();
+
+    setTimers((prev) => {
+      // 1. Pause current
+      const curr = prev[currentMode];
+      const currRemaining = curr.endTimestamp
+        ? Math.max(0, Math.ceil((curr.endTimestamp - now) / 1000))
+        : curr.remainingSec;
+
+      // 2. Start new
+      const target = prev[newMode];
+      const newRemaining = target.remainingSec > 0 ? target.remainingSec : target.durationSec;
+      const newEnd = now + newRemaining * 1000;
+
+      const next: AllTimersState = {
+        ...prev,
+        [currentMode]: {
+          ...curr,
+          status: 'paused',
+          endTimestamp: null,
+          remainingSec: currRemaining,
+        },
+        [newMode]: {
+          ...target,
+          status: 'running',
+          remainingSec: newRemaining,
+          endTimestamp: newEnd,
+        },
+      };
+      try {
+        localStorage.setItem(TIMERS_STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    if (newMode === 'BREAK') {
+      setBreakCompleted(false);
+      setBreakClaimed(false);
+    }
+
+    setConfirmSwitch(null);
+  };
+
+  const handleCancelSwitch = () => {
+    setConfirmSwitch(null);
+  };
+
+  const handlePauseTimer = (modeToPause: TimerMode) => {
+    const now = Date.now();
+    setTimers((prev) => {
+      const current = prev[modeToPause];
+      const remaining = current.endTimestamp
+        ? Math.max(0, Math.ceil((current.endTimestamp - now) / 1000))
+        : current.remainingSec;
+
+      const next: AllTimersState = {
+        ...prev,
+        [modeToPause]: {
+          ...current,
+          status: 'paused',
+          endTimestamp: null,
+          remainingSec: remaining,
+        },
+      };
+      try {
+        localStorage.setItem(TIMERS_STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleResetTimer = (modeToReset: TimerMode) => {
+    setTimers((prev) => {
+      const current = prev[modeToReset];
+      const next: AllTimersState = {
+        ...prev,
+        [modeToReset]: {
+          ...current,
+          status: 'idle',
+          endTimestamp: null,
+          remainingSec: current.durationSec,
+        },
+      };
+      try {
+        localStorage.setItem(TIMERS_STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+    if (modeToReset === 'BREAK') {
+      setBreakCompleted(false);
+      setBreakClaimed(false);
+    }
+  };
 
   // 3-Phase Breathing Engine
   useEffect(() => {
@@ -351,45 +605,6 @@ export default function App() {
     if (settings.soundEnabled) soundEngine.playTone('splash');
   };
 
-  const startBreakSession = () => {
-    setIsCheckpointOpen(false);
-    setMode('BREAK');
-    setTimeLeft((settings.breakDurationMins || 3) * 60);
-    setIsRunning(false); // paused — user must press Start Break
-    setBreakCompleted(false);
-    setBreakClaimed(false);
-  };
-
-  const startBreakTimer = () => {
-    setIsRunning(true);
-    window.electronAPI?.sendNotification(
-      'Break Time Started! 🧘',
-      `Take a ${settings.breakDurationMins || 3}-minute break now!`
-    );
-  };
-
-  const handleStartLunchBreak = () => {
-    setMode('LUNCH');
-    setTimeLeft((settings.lunchBreakMins || 45) * 60);
-    setIsRunning(false); // paused — user must press Start Lunch Break
-  };
-
-  const startLunchTimer = () => {
-    setIsRunning(true);
-    if (settings.soundEnabled) soundEngine.playTone('chime');
-    window.electronAPI?.sendNotification(
-      'Lunch Break Started 🍱',
-      `Enjoy your ${settings.lunchBreakMins || 45}-minute meal break!`
-    );
-  };
-
-  const startFocusSession = () => {
-    setMode('FOCUS');
-    setTimeLeft(settings.breakIntervalMins * 60);
-    setIsRunning(false); // paused — user must press Start Focus
-    if (stats.lastCheckpointNote) setShowWelcomeBackBanner(true);
-  };
-
   const handleSaveCheckpoint = (note: string) => {
     setStats((prev) => ({
       ...prev,
@@ -398,10 +613,9 @@ export default function App() {
     }));
     try {
       localStorage.setItem('pausepulse_checkpoint_note', note);
-    } catch {
-      // Ignore
-    }
-    startBreakSession();
+    } catch {}
+    setIsCheckpointOpen(false);
+    setDisplayedMode('BREAK');
   };
 
   const handleAddWater = (amountMl: number) => {
@@ -411,7 +625,7 @@ export default function App() {
       waterIntakeMl: prev.waterIntakeMl + amountMl,
       points: prev.points + 20,
     }));
-    window.electronAPI?.sendNotification(
+    window.electronAPI?.sendNotification?.(
       'Hydration Logged! 💧',
       `Awesome! Logged ${amountMl}ml of water (+20 points)`
     );
@@ -421,12 +635,35 @@ export default function App() {
     setSettings(newSettings);
     try {
       localStorage.setItem('pausepulse_settings', JSON.stringify(newSettings));
-    } catch {
-      // Ignore
-    }
-    setMode('FOCUS');
-    setTimeLeft(newSettings.breakIntervalMins * 60);
-    setIsRunning(false); // paused after settings change
+    } catch {}
+
+    setTimers((prev) => {
+      const newFocusDur = newSettings.breakIntervalMins * 60;
+      const newBreakDur = (newSettings.breakDurationMins || 3) * 60;
+      const newLunchDur = (newSettings.lunchBreakMins || 45) * 60;
+
+      const next: AllTimersState = {
+        FOCUS: {
+          ...prev.FOCUS,
+          durationSec: newFocusDur,
+          remainingSec: prev.FOCUS.status === 'idle' ? newFocusDur : prev.FOCUS.remainingSec,
+        },
+        BREAK: {
+          ...prev.BREAK,
+          durationSec: newBreakDur,
+          remainingSec: prev.BREAK.status === 'idle' ? newBreakDur : prev.BREAK.remainingSec,
+        },
+        LUNCH: {
+          ...prev.LUNCH,
+          durationSec: newLunchDur,
+          remainingSec: prev.LUNCH.status === 'idle' ? newLunchDur : prev.LUNCH.remainingSec,
+        },
+      };
+      try {
+        localStorage.setItem(TIMERS_STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   const handleToggleTheme = () => {
@@ -435,14 +672,12 @@ export default function App() {
     setSettings(updated);
     try {
       localStorage.setItem('pausepulse_settings', JSON.stringify(updated));
-    } catch {
-      // Ignore
-    }
+    } catch {}
   };
 
   const handleTriggerTestAlert = () => {
     if (settings.soundEnabled) soundEngine.playTone(settings.selectedTone, settings.customSoundUrl);
-    window.electronAPI?.sendNotification(
+    window.electronAPI?.sendNotification?.(
       'PausePulse Alert Test 🎯',
       'Time to take a relaxing micro-break and drink water! 💧'
     );
@@ -469,7 +704,6 @@ export default function App() {
     if (pts < 500) return { name: 'Health Novice', level: 1, next: 500, percent: Math.round((pts / 500) * 100) };
     if (pts < 1500) return { name: 'Pacing Pro', level: 2, next: 1500, percent: Math.round((pts / 1500) * 100) };
     if (!PLAN_LIMITS[userPlan].allTiers) {
-      // Capped at Level 2 for Free Trial
       return { name: 'Pacing Pro (Trial Max)', level: 2, next: 1500, percent: 100 };
     }
     if (pts < 3000) return { name: 'Pro Master', level: 3, next: 3000, percent: Math.round((pts / 3000) * 100) };
@@ -477,19 +711,25 @@ export default function App() {
   };
 
   const levelInfo = getLevelInfo(stats.points);
-  const totalDuration =
-    mode === 'FOCUS'
-      ? settings.breakIntervalMins * 60
-      : mode === 'LUNCH'
-      ? (settings.lunchBreakMins || 45) * 60
-      : (settings.breakDurationMins || 3) * 60;
 
-  // SVG circular timer circumference calculations (radius = 70, circumference = 2 * PI * 70 = 439.82)
+  const runningMode = (['FOCUS', 'BREAK', 'LUNCH'] as TimerMode[]).find(
+    (m) => timers[m].status === 'running'
+  );
+  const isAnyRunning = !!runningMode;
+  const activeTopMode = runningMode || displayedMode;
+  const activeTopTimer = timers[activeTopMode];
+
+  const currentDisplayTimer = timers[displayedMode];
+  const currentDuration = currentDisplayTimer.durationSec;
+  const currentRemaining = currentDisplayTimer.remainingSec;
+
+  // SVG circular timer circumference calculations
   const circleRadius = 70;
   const circumference = 2 * Math.PI * circleRadius;
-  const strokeDashoffset = circumference - (circumference * timeLeft) / Math.max(totalDuration, 1);
+  const strokeDashoffset = circumference - (circumference * currentRemaining) / Math.max(currentDuration, 1);
 
   const isDark = settings.theme === 'dark';
+  const isReducedMotion = settings.reduceMotion || (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   // License gate
   if (licenseStatus === 'gate') {
@@ -507,41 +747,13 @@ export default function App() {
 
   return (
     <div
-      className={`relative w-full h-screen flex flex-col font-['Inter',sans-serif] overflow-hidden select-none transition-colors duration-300 ${
-        isDark ? 'text-slate-100' : 'text-slate-900'
-      }`}
+      data-theme={settings.theme}
+      className="relative w-full h-screen flex flex-col font-['Inter',sans-serif] overflow-hidden select-none bg-[var(--bg)] text-[var(--text)] transition-colors duration-300"
     >
       {/* ═══════════════════════════════════════════════
-           THREEUI ENERGY ORB 3D BACKGROUND
+           TOP TITLE BAR (Mac Traffic Lights + Mode Info Pill + Controls)
          ═══════════════════════════════════════════════ */}
-      <div className="shader-frame absolute inset-0 pointer-events-none z-0 overflow-hidden">
-        <GlobeCollection
-          variant="energy-orb"
-          speed={isBreathingActive ? 1.40 : 1.00}
-          scale={1.00}
-          smokeScale={1.00}
-          smokeStrength={1.00}
-          smokeSpeed={1.00}
-          hue={0}
-          saturation={1.00}
-          glow={1.00}
-          starDensity={1.00}
-          starSpeed={1.00}
-          starSize={1.00}
-          brightness={isDark ? 1.00 : 0.85}
-          opacity={isDark ? 0.95 : 0.65}
-        />
-      </div>
-      {/* ═══════════════════════════════════════════════
-           TOP TITLE BAR (Mac Traffic Lights + Search + Plan Pill + Controls)
-         ═══════════════════════════════════════════════ */}
-      <header
-        className={`titlebar-drag relative z-10 h-12 flex-shrink-0 flex items-center justify-between px-4 border-b transition-colors ${
-          isDark
-            ? 'bg-purple-950/40 border-purple-500/20 backdrop-blur-2xl'
-            : 'bg-purple-50/70 border-purple-200/60 backdrop-blur-xl shadow-sm'
-        }`}
-      >
+      <header className="titlebar-drag relative z-20 h-12 flex-shrink-0 flex items-center justify-between px-4 border-b border-[var(--border)] glass-panel transition-colors">
         {/* Left: Window Control Dots */}
         <div className="flex items-center space-x-2.5 titlebar-nodrag">
           <button
@@ -558,55 +770,62 @@ export default function App() {
           />
           <button
             type="button"
-            onClick={() => setIsRunning(!isRunning)}
+            onClick={() => {
+              if (isAnyRunning && runningMode) {
+                handlePauseTimer(runningMode);
+              } else {
+                handleStartTimer(displayedMode);
+              }
+            }}
             className="w-3 h-3 rounded-full bg-emerald-500/80 hover:bg-emerald-500 transition-colors shadow-xs cursor-pointer"
-            title="Play / Pause Timer"
+            title={isAnyRunning ? 'Pause Running Timer' : `Start ${displayedMode} Timer`}
           />
 
-          <span className={`text-xs font-bold tracking-tight ml-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+          <span className="text-xs font-bold tracking-tight ml-2 text-[var(--text)]">
             PausePulse
           </span>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/25">
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--border)]">
             v2.1
           </span>
         </div>
 
-        {/* Center: Search / Session Info Pill */}
+        {/* Center: Live Running Timer Pill */}
         <div className="titlebar-drag hidden md:flex items-center">
-          <div
-            className={`px-4 py-1 rounded-full text-xs font-medium flex items-center space-x-2 border ${
-              isDark ? 'bg-slate-950/60 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-600'
-            }`}
-          >
-            <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-            <span>
-              {mode === 'FOCUS' ? 'Deep Work Session' : mode === 'LUNCH' ? 'Lunch Break' : 'Resting Break'} —{' '}
-              {formatTime(timeLeft)}
+          <div className="px-4 py-1 rounded-full text-xs font-medium flex items-center space-x-2 border glass-pill">
+            <div className={`w-2 h-2 rounded-full ${isAnyRunning ? 'bg-[var(--success)] animate-pulse' : 'bg-[var(--warning)]'}`} />
+            <span className="text-[var(--text)] font-mono">
+              {activeTopMode === 'FOCUS' ? 'Deep Work' : activeTopMode === 'LUNCH' ? 'Lunch Break' : 'Resting Break'} —{' '}
+              {formatTime(activeTopTimer.remainingSec)}
             </span>
+            {isAnyRunning && (
+              <span className="text-[10px] text-[var(--accent)] font-semibold uppercase tracking-wider ml-1">
+                (Running)
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Right: Plan Badge Pill + Focus Score + Actions */}
+        {/* Right: Plan Badge Pill + Action Controls */}
         <div className="flex items-center space-x-2 titlebar-nodrag">
-          {/* Plan Badge Pill (Click to open Upgrade Modal / Simulator) */}
+          {/* Plan Badge Pill */}
           <button
             type="button"
             onClick={() => openUpgradeModal()}
             className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
               userPlan === 'team'
-                ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25'
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-500 hover:bg-amber-500/25'
                 : userPlan === 'pro'
-                ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/25'
-                : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25'
+                ? 'bg-[var(--accent)]/15 border-[var(--border)] text-[var(--accent)] hover:bg-[var(--accent)]/25'
+                : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/25'
             }`}
             title="Click to view plan features or simulate tiers"
           >
             {userPlan === 'team' ? (
-              <Crown className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <Crown className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
             ) : userPlan === 'pro' ? (
               <Zap className="w-3.5 h-3.5 fill-indigo-400 text-indigo-400" />
             ) : (
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
             )}
             <span className="uppercase text-[10px] tracking-wider">
               {userPlan === 'team' ? 'Team Plan' : userPlan === 'pro' ? 'Pro Monthly' : 'Free Trial'}
@@ -614,24 +833,11 @@ export default function App() {
             <ArrowUpRight className="w-3 h-3 opacity-60" />
           </button>
 
-          {/* Focus Score pill */}
-          <div
-            className={`hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-xl border ${
-              isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-100 border-slate-200'
-            }`}
-          >
-            <Target className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="text-[11px] text-slate-400 font-medium">Focus Score:</span>
-            <span className="text-xs font-extrabold text-cyan-400">94/100</span>
-          </div>
-
-          {/* Test Sound */}
+          {/* Test Sound Alert */}
           <button
             type="button"
             onClick={handleTriggerTestAlert}
-            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-              isDark ? 'border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-100'
-            }`}
+            className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors cursor-pointer"
             title="Test Alert Chime"
           >
             <Bell className="w-3.5 h-3.5" />
@@ -641,21 +847,17 @@ export default function App() {
           <button
             type="button"
             onClick={handleToggleTheme}
-            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-              isDark ? 'border-slate-800 text-slate-400 hover:text-amber-400 hover:bg-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-100'
-            }`}
+            className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--warning)] hover:bg-[var(--surface-2)] transition-colors cursor-pointer"
             title="Toggle Dark / Light Theme"
           >
-            {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-indigo-500" />}
+            {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-[var(--accent)]" />}
           </button>
 
           {/* Settings */}
           <button
             type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-              isDark ? 'border-slate-800 text-slate-400 hover:text-indigo-400 hover:bg-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-100'
-            }`}
+            className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] transition-colors cursor-pointer"
             title="Open Settings"
           >
             <Sliders className="w-3.5 h-3.5" />
@@ -664,28 +866,22 @@ export default function App() {
       </header>
 
       {/* ═══════════════════════════════════════════════
-           MAIN BODY: Left Sidebar + Right Content Area
+           MAIN BODY: Left Sidebar + Right Content View
          ═══════════════════════════════════════════════ */}
       <div className="relative z-10 flex-1 flex overflow-hidden">
         {/* ── LEFT SIDEBAR ────────────────────────────── */}
-        <aside
-          className={`w-60 flex-shrink-0 flex flex-col justify-between p-3.5 border-r transition-colors ${
-            isDark
-              ? 'bg-purple-950/35 border-purple-500/20 backdrop-blur-2xl'
-              : 'bg-white/60 border-purple-200/50 backdrop-blur-xl'
-          }`}
-        >
+        <aside className="w-60 flex-shrink-0 flex flex-col justify-between p-3.5 border-r border-[var(--border)] glass-panel transition-colors">
           {/* Nav List */}
           <div className="space-y-1">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2 flex items-center justify-between">
+            <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-3 mb-2 flex items-center justify-between">
               <span>Dashboard</span>
-              <span className="text-[9px] text-indigo-400 font-mono lowercase">
+              <span className="text-[9px] text-[var(--accent)] font-mono lowercase">
                 {userPlan} tier
               </span>
             </div>
 
             {[
-              { id: 'TIMER', icon: Clock, label: 'Focus Timer', badge: isRunning ? 'Live' : undefined },
+              { id: 'TIMER', icon: Clock, label: 'Focus Timer', badge: isAnyRunning ? 'Live' : undefined },
               { id: 'HYDRATION', icon: Droplets, label: 'Hydration', badge: `${stats.waterIntakeMl}ml` },
               {
                 id: 'MOOD',
@@ -723,14 +919,12 @@ export default function App() {
                   onClick={() => setActiveTab(tab.id as ActiveNavTab)}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-gradient-to-r from-violet-600 to-purple-500 text-white shadow-md shadow-violet-500/30 font-bold'
-                      : isDark
-                      ? 'text-purple-200/70 hover:text-white hover:bg-purple-500/20'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-purple-100/60'
+                      ? 'bg-[var(--accent)] text-[var(--accent-contrast)] shadow-md font-bold'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]'
                   }`}
                 >
                   <div className="flex items-center space-x-2.5">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : isDark ? 'text-purple-300/60' : 'text-slate-400'}`} />
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-[var(--accent-contrast)]' : 'text-[var(--text-muted)]'}`} />
                     <span>{tab.label}</span>
                   </div>
                   {tab.badge && (
@@ -739,10 +933,8 @@ export default function App() {
                         isActive
                           ? 'bg-white/20 text-white'
                           : tab.badge.includes('🔒')
-                          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
-                          : isDark
-                          ? 'bg-purple-900/50 text-purple-300'
-                          : 'bg-slate-200 text-slate-600'
+                          ? 'bg-amber-500/15 text-amber-500 border border-amber-500/20'
+                          : 'glass-pill text-[var(--text-muted)]'
                       }`}
                     >
                       {tab.badge}
@@ -754,34 +946,28 @@ export default function App() {
           </div>
 
           {/* Bottom Card: Your Level Card */}
-          <div className="space-y-2 pt-3 border-t border-purple-500/20">
-            <div
-              className={`p-3 rounded-2xl border transition-all ${
-                isDark
-                  ? 'bg-purple-950/40 border-purple-500/25 shadow-sm backdrop-blur-sm'
-                  : 'bg-white/70 border-purple-200/50 shadow-sm backdrop-blur-sm'
-              }`}
-            >
-              <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold mb-1">
+          <div className="space-y-2 pt-3 border-t border-[var(--border)]">
+            <div className="p-3 rounded-2xl border border-[var(--border)] glass-pill shadow-sm">
+              <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-semibold mb-1">
                 <span>Your Level</span>
                 {!PLAN_LIMITS[userPlan].allTiers && (
-                  <span className="text-[9px] text-amber-400 font-bold">Trial Cap Lvl 2</span>
+                  <span className="text-[9px] text-[var(--warning)] font-bold">Trial Cap Lvl 2</span>
                 )}
               </div>
               <div className="flex items-center justify-between">
-                <div className="text-sm font-black text-indigo-400 flex items-center gap-1">
-                  <Zap className="w-3.5 h-3.5 fill-indigo-400" />
+                <div className="text-sm font-black text-[var(--accent)] flex items-center gap-1">
+                  <Zap className="w-3.5 h-3.5 fill-current" />
                   <span>{levelInfo.name}</span>
                 </div>
-                <div className="text-xs font-extrabold text-cyan-400 font-mono">
+                <div className="text-xs font-extrabold text-[var(--hydration)] font-mono">
                   {stats.points.toLocaleString()} pts
                 </div>
               </div>
 
-              {/* Animated Progress Bar */}
-              <div className={`mt-2 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
+              {/* Progress Bar */}
+              <div className="mt-2 h-1.5 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
                 <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-700"
+                  className="h-full bg-gradient-to-r from-[var(--accent)] to-[var(--hydration)] transition-all duration-700"
                   style={{ width: `${levelInfo.percent}%` }}
                 />
               </div>
@@ -789,7 +975,7 @@ export default function App() {
 
             {/* Floating Level Up Toast Notification */}
             {levelUpToast && (
-              <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 animate-in slide-in-from-bottom duration-300">
+              <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-500 dark:text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 animate-in slide-in-from-bottom duration-300">
                 <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
                 <span className="truncate">{levelUpToast}</span>
               </div>
@@ -798,355 +984,295 @@ export default function App() {
         </aside>
 
         {/* ── RIGHT MAIN VIEW ─────────────────────────── */}
-        <main className="flex-1 overflow-y-auto p-6 transition-colors bg-transparent">
+        <main className="relative flex-1 min-h-0 flex flex-col overflow-y-auto p-6 transition-colors bg-transparent">
+          {/* ═══════════════════════════════════════════════
+               THREEUI ENERGY ORB 3D BACKGROUND (Centered inside main)
+             ═══════════════════════════════════════════════ */}
+          <div className="shader-frame absolute inset-0 pointer-events-none z-0 overflow-hidden">
+            <GlobeCollection
+              variant="energy-orb"
+              speed={isReducedMotion ? 0.00 : isBreathingActive ? 1.40 : 1.00}
+              scale={1.00}
+              smokeScale={1.00}
+              smokeStrength={1.00}
+              smokeSpeed={isReducedMotion ? 0.00 : 1.00}
+              hue={0}
+              saturation={1.00}
+              glow={1.00}
+              starDensity={1.00}
+              starSpeed={isReducedMotion ? 0.00 : 1.00}
+              starSize={1.00}
+              brightness={isDark ? 1.00 : 0.85}
+              opacity={isDark ? 0.95 : 0.65}
+            />
+          </div>
+
           <TabErrorBoundary onReset={() => setActiveTab('TIMER')}>
             {/* TAB 1: FOCUS TIMER */}
             {activeTab === 'TIMER' && (
-            <div className="max-w-2xl mx-auto space-y-6">
-              {/* Header Row */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className={`text-xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                    {mode === 'FOCUS' ? 'Focus Session' : mode === 'LUNCH' ? 'Lunch Break' : 'Resting Break'}
-                  </h1>
-                  <p className="text-xs text-slate-400">
-                    {mode === 'FOCUS'
-                      ? 'Deep work mode active — eliminate distractions'
-                      : mode === 'LUNCH'
-                      ? 'Step away for a nourishing meal'
-                      : 'Rest your eyes and stretch your body'}
-                  </p>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>{isRunning ? 'Active' : 'Paused'}</span>
+              <div className="relative z-10 flex-1 flex flex-col justify-between items-center w-full max-w-2xl mx-auto py-2 my-auto">
+                {/* Header Row / Mode Selector */}
+                <div className="w-full flex items-center justify-between glass-panel p-3.5 rounded-2xl mb-auto">
+                  <div>
+                    <h1 className="text-lg font-black tracking-tight text-[var(--text)]">
+                      {displayedMode === 'FOCUS' ? 'Focus Session' : displayedMode === 'LUNCH' ? 'Lunch Break' : 'Resting Break'}
+                    </h1>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {displayedMode === 'FOCUS'
+                        ? 'Deep work mode active — eliminate distractions'
+                        : displayedMode === 'LUNCH'
+                        ? 'Step away for a nourishing meal'
+                        : 'Rest your eyes and stretch your body'}
+                    </p>
                   </div>
 
-                  {/* Mode Selector Buttons */}
-                  <div className={`p-1 rounded-xl border flex space-x-1 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-200 border-slate-300'}`}>
-                    <button
-                      type="button"
-                      onClick={startFocusSession}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        mode === 'FOCUS' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Focus
-                    </button>
-                    <button
-                      type="button"
-                      onClick={startBreakSession}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        mode === 'BREAK' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Break
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleStartLunchBreak}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        mode === 'LUNCH' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      🍱 Lunch
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Welcome Back Checkpoint Banner */}
-              {showWelcomeBackBanner && stats.lastCheckpointNote && (
-                <div
-                  className={`p-3 rounded-2xl border flex items-center justify-between shadow-md transition-all ${
-                    isDark ? 'bg-indigo-950/60 border-indigo-500/40 text-indigo-200' : 'bg-indigo-50 border-indigo-300 text-indigo-900'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <Bookmark className="w-4 h-4 text-indigo-400 shrink-0" />
-                    <div>
-                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
-                        Welcome Back Note:
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full glass-pill text-xs font-bold">
+                      <div className={`w-2 h-2 rounded-full ${timers[displayedMode].status === 'running' ? 'bg-[var(--success)] animate-pulse' : 'bg-[var(--warning)]'}`} />
+                      <span className="text-[var(--text)]">
+                        {timers[displayedMode].status === 'running' ? 'Active' : timers[displayedMode].status === 'paused' ? 'Paused' : 'Ready'}
                       </span>
-                      <p className="text-xs font-semibold text-white">"{stats.lastCheckpointNote}"</p>
                     </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowWelcomeBackBanner(false)}
-                    className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
 
-              {/* ── CENTER SVG CIRCULAR COUNTDOWN TIMER ───────── */}
-              <div className="flex flex-col items-center justify-center py-6">
-                <div className="relative inline-flex items-center justify-center mb-6">
-                  <svg width="220" height="220" viewBox="0 0 160 160" className="transform -rotate-90">
-                    {/* Outer glow ring */}
-                    <circle
-                      cx="80"
-                      cy="80"
-                      r={circleRadius + 4}
-                      fill="none"
-                      stroke={isDark ? 'rgba(168,85,247,0.08)' : 'rgba(168,85,247,0.12)'}
-                      strokeWidth="2"
-                    />
-                    {/* Track ring */}
-                    <circle
-                      cx="80"
-                      cy="80"
-                      r={circleRadius}
-                      fill="none"
-                      stroke={isDark ? 'rgba(168,85,247,0.15)' : 'rgba(139,92,246,0.15)'}
-                      strokeWidth="8"
-                    />
-                    {/* Progress arc */}
-                    <circle
-                      cx="80"
-                      cy="80"
-                      r={circleRadius}
-                      fill="none"
-                      stroke="url(#timerGradLavender)"
-                      strokeWidth="8"
-                      strokeLinecap="round"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={strokeDashoffset}
-                      className="transition-all duration-1000 ease-linear"
-                    />
-                    <defs>
-                      <linearGradient id="timerGradLavender" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#a855f7" />
-                        <stop offset="60%" stopColor="#c084fc" />
-                        <stop offset="100%" stopColor="#e879f9" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-
-                  <div className="absolute text-center px-4 py-2 rounded-2xl bg-purple-950/30 backdrop-blur-sm border border-purple-400/15">
-                    <div className="text-4xl font-black font-mono tracking-tight text-white drop-shadow-lg">
-                      {formatTime(timeLeft)}
-                    </div>
-                    <div className="text-[10px] text-purple-300/80 font-semibold tracking-wider uppercase mt-1">
-                      {mode === 'FOCUS'
-                        ? 'remaining'
-                        : mode === 'LUNCH'
-                        ? 'lunch remaining'
-                        : breakCompleted
-                        ? '✅ break complete!'
-                        : !isRunning
-                        ? '▶ press start break'
-                        : 'break remaining'}
+                    {/* Mode Selector Buttons — Switching only changes displayedMode, never resets */}
+                    <div className="p-1 rounded-xl glass-pill flex space-x-1">
+                      <button
+                        type="button"
+                        onClick={() => setDisplayedMode('FOCUS')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          displayedMode === 'FOCUS' ? 'bg-[var(--accent)] text-[var(--accent-contrast)] shadow-xs' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                        }`}
+                      >
+                        Focus
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDisplayedMode('BREAK')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          displayedMode === 'BREAK' ? 'bg-[var(--break)] text-white shadow-xs' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                        }`}
+                      >
+                        Break
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDisplayedMode('LUNCH')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1 ${
+                          displayedMode === 'LUNCH' ? 'bg-[var(--lunch)] text-white shadow-xs' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                        }`}
+                      >
+                        <Utensils className="w-3 h-3 inline mr-1" />
+                        <span>Lunch</span>
+                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Main Action Controls */}
-                <div className="flex items-center space-x-3 flex-wrap gap-y-2">
-
-                  {/* ── FOCUS: Start button when not yet running ── */}
-                  {mode === 'FOCUS' && !isRunning && (
+                {/* Welcome Back Checkpoint Banner */}
+                {showWelcomeBackBanner && stats.lastCheckpointNote && (
+                  <div className="w-full my-3 p-3 rounded-2xl glass-panel border border-[var(--border)] flex items-center justify-between shadow-md transition-all">
+                    <div className="flex items-center space-x-2.5">
+                      <Bookmark className="w-4 h-4 text-[var(--accent)] shrink-0" />
+                      <div>
+                        <span className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-wider">
+                          Welcome Back Note:
+                        </span>
+                        <p className="text-xs font-semibold text-[var(--text)]">"{stats.lastCheckpointNote}"</p>
+                      </div>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsRunning(true);
-                        if (settings.soundEnabled) soundEngine.playTone(settings.selectedTone, settings.customSoundUrl);
-                        window.electronAPI?.sendNotification('Focus Session Started! ⚡', 'Deep work mode active. Stay focused!');
-                      }}
-                      className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
+                      onClick={() => setShowWelcomeBackBanner(false)}
+                      className="p-1 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer"
                     >
-                      <Play className="w-4 h-4 fill-white" />
-                      <span>Start Focus ({settings.breakIntervalMins}m)</span>
+                      <X className="w-3.5 h-3.5" />
                     </button>
-                  )}
+                  </div>
+                )}
 
-                  {/* ── FOCUS: Pause button when running ── */}
-                  {mode === 'FOCUS' && isRunning && (
-                    <button
-                      type="button"
-                      onClick={() => setIsRunning(false)}
-                      className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
-                    >
-                      <Pause className="w-4 h-4" />
-                      <span>Pause</span>
-                    </button>
-                  )}
+                {/* ── CENTER SVG CIRCULAR COUNTDOWN TIMER (Centered directly on planet) ── */}
+                <div className="flex flex-col items-center justify-center my-auto py-4">
+                  <div className="relative inline-flex items-center justify-center mb-6">
+                    <svg width="220" height="220" viewBox="0 0 160 160" className="transform -rotate-90">
+                      {/* Outer glow ring */}
+                      <circle
+                        cx="80"
+                        cy="80"
+                        r={circleRadius + 4}
+                        fill="none"
+                        stroke="var(--border)"
+                        strokeWidth="2"
+                      />
+                      {/* Track ring */}
+                      <circle
+                        cx="80"
+                        cy="80"
+                        r={circleRadius}
+                        fill="none"
+                        stroke="var(--border)"
+                        strokeWidth="8"
+                      />
+                      {/* Progress arc */}
+                      <circle
+                        cx="80"
+                        cy="80"
+                        r={circleRadius}
+                        fill="none"
+                        stroke="url(#timerGradLavender)"
+                        strokeWidth="8"
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={strokeDashoffset}
+                        className="transition-all duration-1000 ease-linear"
+                      />
+                      <defs>
+                        <linearGradient id="timerGradLavender" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="#a855f7" />
+                          <stop offset="60%" stopColor="#c084fc" />
+                          <stop offset="100%" stopColor="#e879f9" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
 
-                  {/* ── BREAK: Start button when not yet running ── */}
-                  {mode === 'BREAK' && !isRunning && !breakCompleted && (
-                    <button
-                      type="button"
-                      onClick={startBreakTimer}
-                      className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
-                    >
-                      <Play className="w-4 h-4 fill-white" />
-                      <span>Start Break ({settings.breakDurationMins || 3}m)</span>
-                    </button>
-                  )}
-
-                  {/* ── BREAK: Pause/Resume when running ── */}
-                  {mode === 'BREAK' && isRunning && (
-                    <button
-                      type="button"
-                      onClick={() => setIsRunning(false)}
-                      className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
-                    >
-                      <Pause className="w-4 h-4" />
-                      <span>Pause Break</span>
-                    </button>
-                  )}
-
-                  {/* ── LUNCH: Start button when not yet running ── */}
-                  {mode === 'LUNCH' && !isRunning && (
-                    <button
-                      type="button"
-                      onClick={startLunchTimer}
-                      className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
-                    >
-                      <Play className="w-4 h-4 fill-white" />
-                      <span>Start Lunch ({settings.lunchBreakMins || 45}m) 🍱</span>
-                    </button>
-                  )}
-
-                  {/* ── LUNCH: Pause/Resume when running ── */}
-                  {mode === 'LUNCH' && isRunning && (
-                    <button
-                      type="button"
-                      onClick={() => setIsRunning(false)}
-                      className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
-                    >
-                      <Pause className="w-4 h-4" />
-                      <span>Pause Lunch</span>
-                    </button>
-                  )}
-
-                  {/* ── Resume button when paused mid-session (not at start) ── */}
-                  {!isRunning && mode === 'FOCUS' && timeLeft < settings.breakIntervalMins * 60 && (
-                    <button
-                      type="button"
-                      onClick={() => setIsRunning(true)}
-                      className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
-                    >
-                      <Play className="w-4 h-4 fill-white" />
-                      <span>Resume</span>
-                    </button>
-                  )}
-
-                  {/* ── Reset ── */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsRunning(false);
-                      setBreakCompleted(false);
-                      setBreakClaimed(false);
-                      setTimeLeft(
-                        mode === 'FOCUS'
-                          ? settings.breakIntervalMins * 60
-                          : mode === 'LUNCH'
-                          ? (settings.lunchBreakMins || 45) * 60
-                          : (settings.breakDurationMins || 3) * 60
-                      );
-                    }}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all active:scale-95 flex items-center space-x-1.5 cursor-pointer ${
-                      isDark ? 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800' : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                    <span>Reset</span>
-                  </button>
-
-                  {/* ── Claim Break (locked until complete, one-time) ── */}
-                  {mode === 'BREAK' && (
-                    <button
-                      type="button"
-                      disabled={!breakCompleted || breakClaimed}
-                      onClick={() => {
-                        if (!breakCompleted || breakClaimed) return;
-                        setBreakClaimed(true);
-                        setStats((prev) => ({ ...prev, breaksCompleted: prev.breaksCompleted + 1, points: prev.points + 50 }));
-                        setLevelUpToast('Claimed +50 pts for completing break! 🎉');
-                        setTimeout(() => setLevelUpToast(null), 3500);
-                      }}
-                      className={`px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg transition-all active:scale-95 flex items-center space-x-1.5 ${
-                        breakClaimed
-                          ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
+                    <div className="absolute text-center px-4 py-2 rounded-2xl glass-panel shadow-xl">
+                      <div className="text-4xl font-black font-mono tracking-tight text-[var(--text)] drop-shadow-lg">
+                        {formatTime(currentRemaining)}
+                      </div>
+                      <div className="text-[10px] text-[var(--text-muted)] font-semibold tracking-wider uppercase mt-1">
+                        {displayedMode === 'FOCUS'
+                          ? 'remaining'
+                          : displayedMode === 'LUNCH'
+                          ? 'lunch remaining'
                           : breakCompleted
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/30 cursor-pointer animate-pulse'
-                          : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
-                      }`}
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      <span>
-                        {breakClaimed ? 'Claimed ✓' : breakCompleted ? 'Claim Break (+50 pts)' : '🔒 Complete break to claim'}
-                      </span>
-                    </button>
-                  )}
-
-                  {/* ── Back to Focus (after break claimed) ── */}
-                  {mode === 'BREAK' && breakClaimed && (
-                    <button
-                      type="button"
-                      onClick={startFocusSession}
-                      className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center space-x-1.5 cursor-pointer"
-                    >
-                      <Play className="w-4 h-4 fill-white" />
-                      <span>Back to Focus</span>
-                    </button>
-                  )}
-
-                  {/* ── Checkpoint (Focus only) ── */}
-                  {mode === 'FOCUS' && isRunning && (
-                    <button
-                      type="button"
-                      onClick={() => setIsCheckpointOpen(true)}
-                      className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        isDark ? 'bg-slate-900/60 hover:bg-slate-800 text-indigo-400 border-indigo-500/30' : 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                      }`}
-                    >
-                      <Bookmark className="w-3.5 h-3.5 inline mr-1" />
-                      <span>Checkpoint</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* ── BOTTOM STATS ROW (Exact match to Mockup!) ── */}
-              <div className="grid grid-cols-3 gap-3">
-                <div
-                  className={`rounded-2xl p-4 text-center border transition-all ${
-                    isDark ? 'bg-cyan-500/10 border-cyan-500/20' : 'bg-cyan-50 border-cyan-200'
-                  }`}
-                >
-                  <div className="text-2xl font-black text-cyan-400 font-mono">{stats.breaksCompleted}</div>
-                  <div className="text-xs text-slate-400 font-medium mt-0.5">Sessions today</div>
-                </div>
-
-                <div
-                  className={`rounded-2xl p-4 text-center border transition-all ${
-                    isDark ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-indigo-50 border-indigo-200'
-                  }`}
-                >
-                  <div className="text-2xl font-black text-indigo-400 font-mono">
-                    💧 {Math.round(stats.waterIntakeMl / 250)}/8
+                          ? '✅ break complete!'
+                          : timers.BREAK.status !== 'running'
+                          ? '▶ press start break'
+                          : 'break remaining'}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-400 font-medium mt-0.5">Water glasses</div>
+
+                  {/* Main Action Controls */}
+                  <div className="flex items-center space-x-3 flex-wrap gap-y-2 justify-center">
+                    {/* ── Start / Resume button when not running ── */}
+                    {timers[displayedMode].status !== 'running' && (
+                      <button
+                        type="button"
+                        onClick={() => handleStartTimer(displayedMode)}
+                        className="px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:opacity-90 text-[var(--accent-contrast)] text-xs font-bold shadow-lg shadow-purple-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
+                      >
+                        <Play className="w-4 h-4 fill-current" />
+                        <span>
+                          {timers[displayedMode].status === 'paused'
+                            ? 'Resume'
+                            : displayedMode === 'FOCUS'
+                            ? `Start Focus (${Math.round(timers.FOCUS.durationSec / 60)}m)`
+                            : displayedMode === 'BREAK'
+                            ? `Start Break (${Math.round(timers.BREAK.durationSec / 60)}m)`
+                            : `Start Lunch (${Math.round(timers.LUNCH.durationSec / 60)}m)`}
+                        </span>
+                      </button>
+                    )}
+
+                    {/* ── Pause button when running ── */}
+                    {timers[displayedMode].status === 'running' && (
+                      <button
+                        type="button"
+                        onClick={() => handlePauseTimer(displayedMode)}
+                        className="px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:opacity-90 text-[var(--accent-contrast)] text-xs font-bold shadow-lg shadow-purple-500/30 transition-all active:scale-95 flex items-center space-x-2 cursor-pointer"
+                      >
+                        <Pause className="w-4 h-4" />
+                        <span>Pause {displayedMode === 'FOCUS' ? 'Focus' : displayedMode === 'BREAK' ? 'Break' : 'Lunch'}</span>
+                      </button>
+                    )}
+
+                    {/* ── Reset button (only resets currently displayed mode) ── */}
+                    <button
+                      type="button"
+                      onClick={() => handleResetTimer(displayedMode)}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold glass-pill text-[var(--text)] hover:bg-[var(--surface)] transition-all active:scale-95 flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Reset</span>
+                    </button>
+
+                    {/* ── Claim Break (locked until complete, one-time) ── */}
+                    {displayedMode === 'BREAK' && (
+                      <button
+                        type="button"
+                        disabled={!breakCompleted || breakClaimed}
+                        onClick={() => {
+                          if (!breakCompleted || breakClaimed) return;
+                          setBreakClaimed(true);
+                          setStats((prev) => ({ ...prev, breaksCompleted: prev.breaksCompleted + 1, points: prev.points + 50 }));
+                          setLevelUpToast('Claimed +50 pts for completing break! 🎉');
+                          setTimeout(() => setLevelUpToast(null), 3500);
+                        }}
+                        className={`px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg transition-all active:scale-95 flex items-center space-x-1.5 ${
+                          breakClaimed
+                            ? 'glass-pill text-[var(--success)] border border-[var(--success)]/40 cursor-not-allowed'
+                            : breakCompleted
+                            ? 'bg-[var(--success)] hover:opacity-90 text-white shadow-emerald-500/30 cursor-pointer animate-pulse'
+                            : 'glass-pill text-[var(--text-muted)] cursor-not-allowed opacity-60'
+                        }`}
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>
+                          {breakClaimed ? 'Claimed ✓' : breakCompleted ? 'Claim Break (+50 pts)' : '🔒 Complete break to claim'}
+                        </span>
+                      </button>
+                    )}
+
+                    {/* ── Back to Focus (after break claimed) ── */}
+                    {displayedMode === 'BREAK' && breakClaimed && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDisplayedMode('FOCUS');
+                          handleStartTimer('FOCUS');
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:opacity-90 text-[var(--accent-contrast)] text-xs font-bold shadow-lg shadow-purple-500/30 transition-all active:scale-95 flex items-center space-x-1.5 cursor-pointer"
+                      >
+                        <Play className="w-4 h-4 fill-current" />
+                        <span>Back to Focus</span>
+                      </button>
+                    )}
+
+                    {/* ── Checkpoint (Focus only) ── */}
+                    {displayedMode === 'FOCUS' && timers.FOCUS.status === 'running' && (
+                      <button
+                        type="button"
+                        onClick={() => setIsCheckpointOpen(true)}
+                        className="px-4 py-2.5 rounded-xl text-xs font-bold glass-pill text-[var(--accent)] hover:bg-[var(--surface)] transition-all cursor-pointer"
+                      >
+                        <Bookmark className="w-3.5 h-3.5 inline mr-1" />
+                        <span>Checkpoint</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <div
-                  className={`rounded-2xl p-4 text-center border transition-all ${
-                    isDark ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'
-                  }`}
-                >
-                  <div className="text-2xl font-black text-amber-400 font-mono">🔥 {stats.streakDays}</div>
-                  <div className="text-xs text-slate-400 font-medium mt-0.5">Day streak</div>
+                {/* ── BOTTOM STATS ROW ── */}
+                <div className="w-full grid grid-cols-3 gap-3 mt-auto">
+                  <div className="glass-panel rounded-2xl p-4 text-center">
+                    <div className="text-2xl font-black text-[var(--hydration)] font-mono">{stats.breaksCompleted}</div>
+                    <div className="text-xs text-[var(--text-muted)] font-medium mt-0.5">Sessions today</div>
+                  </div>
+
+                  <div className="glass-panel rounded-2xl p-4 text-center">
+                    <div className="text-2xl font-black text-[var(--accent)] font-mono">
+                      💧 {Math.round(stats.waterIntakeMl / 250)}/8
+                    </div>
+                    <div className="text-xs text-[var(--text-muted)] font-medium mt-0.5">Water glasses</div>
+                  </div>
+
+                  <div className="glass-panel rounded-2xl p-4 text-center">
+                    <div className="text-2xl font-black text-[var(--warning)] font-mono">🔥 {stats.streakDays}</div>
+                    <div className="text-xs text-[var(--text-muted)] font-medium mt-0.5">Day streak</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* TAB 2: HYDRATION */}
           {activeTab === 'HYDRATION' && (
@@ -1282,10 +1408,10 @@ export default function App() {
 
           {/* TAB 4: BREATHING EXERCISE (3-Phase: Inhale -> Hold -> Exhale) */}
           {activeTab === 'BREATHING' && (
-            <div className="max-w-md mx-auto text-center space-y-6 py-4">
+            <div className="relative z-10 max-w-md mx-auto text-center space-y-6 py-6 glass-panel p-6 rounded-3xl">
               <div>
-                <h2 className="text-lg font-black tracking-tight">3-Phase Guided Box Breathing</h2>
-                <p className="text-xs text-slate-400">4s Inhale ➔ 4s Hold ➔ 4s Exhale (12s per cycle)</p>
+                <h2 className="text-lg font-black tracking-tight text-[var(--text)]">3-Phase Guided Breathing</h2>
+                <p className="text-xs text-[var(--text-muted)]">4s Inhale ➔ 4s Hold ➔ 4s Exhale (12s per cycle)</p>
               </div>
 
               {/* 3 Step Indicator Pills */}
@@ -1298,7 +1424,7 @@ export default function App() {
                   <div
                     key={s.id}
                     className={`py-2 rounded-xl border text-xs font-bold transition-all ${
-                      breathPhase === s.id ? `${s.color} shadow-lg scale-105 font-black` : 'border-slate-800 text-slate-500 bg-slate-950/40'
+                      breathPhase === s.id ? `${s.color} shadow-lg scale-105 font-black` : 'border-[var(--border)] text-[var(--text-muted)] glass-pill'
                     }`}
                   >
                     {s.label}
@@ -1318,8 +1444,8 @@ export default function App() {
                   }`}
                 />
                 <div className="text-center z-10">
-                  <span className="text-5xl font-black font-mono text-white">{breathSecs}</span>
-                  <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                  <span className="text-5xl font-black font-mono text-[var(--text)]">{breathSecs}</span>
+                  <div className="text-[10px] text-[var(--text-muted)] font-bold uppercase mt-1">
                     Cycle #{breathCycles + 1}
                   </div>
                 </div>
@@ -1330,7 +1456,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setIsBreathingActive(!isBreathingActive)}
-                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/30 transition-all cursor-pointer flex items-center space-x-1.5"
+                  className="px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:opacity-90 text-[var(--accent-contrast)] text-xs font-bold shadow-lg shadow-purple-500/30 transition-all cursor-pointer flex items-center space-x-1.5"
                 >
                   {isBreathingActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                   <span>{isBreathingActive ? 'Pause Breathing' : 'Start Guided Breathing'}</span>
@@ -1345,9 +1471,7 @@ export default function App() {
                     setBreathCycles(0);
                     setBreathSessionClaimed(false); // allow new claim after reset
                   }}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                    isDark ? 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800' : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
-                  }`}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold border border-[var(--border)] glass-pill text-[var(--text)] hover:bg-[var(--surface-2)] transition-all cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5 inline mr-1" />
                   Reset
@@ -1359,10 +1483,10 @@ export default function App() {
                   onClick={() => handleClaimBonus(30, '3-Phase Breathing', 'breath')}
                   className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     breathSessionClaimed
-                      ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
+                      ? 'glass-pill text-[var(--success)] border border-[var(--success)]/40 cursor-not-allowed'
                       : breathCycles >= 1
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/30 cursor-pointer animate-pulse'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                      ? 'bg-[var(--success)] hover:opacity-90 text-white shadow-md shadow-emerald-500/30 cursor-pointer animate-pulse'
+                      : 'glass-pill text-[var(--text-muted)] cursor-not-allowed opacity-60'
                   }`}
                 >
                   <Sparkles className="w-3.5 h-3.5 inline mr-1" />
@@ -1374,39 +1498,39 @@ export default function App() {
 
           {/* TAB 5: STRESS BUSTER MINI GAME (With Pro Plan Gating) */}
           {activeTab === 'GAMES' && (
-            <div className="max-w-md mx-auto space-y-4 py-4 text-center relative">
+            <div className="relative z-10 max-w-md mx-auto space-y-4 py-4 text-center">
               {!PLAN_LIMITS[userPlan].bubbleGame ? (
-                <div className="p-8 rounded-3xl border border-indigo-500/30 bg-slate-900/90 text-center space-y-4">
-                  <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400">
+                <div className="p-8 rounded-3xl border border-[var(--border)] glass-panel text-center space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-[var(--accent)]/20 border border-[var(--border)] flex items-center justify-center mx-auto text-[var(--accent)]">
                     <Gamepad2 className="w-7 h-7" />
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-white">Stress Buster Game is a Pro Feature</h3>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <h3 className="text-base font-black text-[var(--text)]">Stress Buster Game is a Pro Feature</h3>
+                    <p className="text-xs text-[var(--text-muted)] mt-1">
                       Pop bubbles to alleviate micro-stress and earn +30 bonus wellness points every break.
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => openUpgradeModal('Stress Buster Game')}
-                    className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-500/25 cursor-pointer active:scale-95 transition-all"
+                    className="px-6 py-2.5 rounded-xl bg-[var(--accent)] hover:opacity-90 text-[var(--accent-contrast)] text-xs font-bold shadow-md shadow-purple-500/25 cursor-pointer active:scale-95 transition-all"
                   >
                     Unlock Game with Pro ($4.99)
                   </button>
                 </div>
               ) : (
-                <>
+                <div className="glass-panel p-6 rounded-3xl space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-lg font-black tracking-tight">Bubble Pop Stress Buster</h2>
-                      <p className="text-xs text-slate-400">Pop bubbles to relieve micro-stress & fatigue</p>
+                      <h2 className="text-lg font-black tracking-tight text-[var(--text)]">Bubble Pop Stress Buster</h2>
+                      <p className="text-xs text-[var(--text-muted)]">Pop bubbles to relieve micro-stress & fatigue</p>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs font-bold text-amber-400 font-mono">Score: {gameScore} pts</span>
+                      <span className="text-xs font-bold text-[var(--warning)] font-mono">Score: {gameScore} pts</span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-3 p-4 rounded-2xl bg-slate-900 border border-slate-800">
+                  <div className="grid grid-cols-4 gap-3 p-4 rounded-2xl glass-pill border border-[var(--border)]">
                     {bubbles.map((b) => (
                       <button
                         key={b.id}
@@ -1428,7 +1552,7 @@ export default function App() {
                         resetBubbleGame();
                         setGameSessionClaimed(false); // allow new claim after reset
                       }}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+                      className="px-4 py-2 rounded-xl glass-pill border border-[var(--border)] text-[var(--text)] text-xs font-semibold cursor-pointer hover:bg-[var(--surface-2)]"
                     >
                       Reset Grid
                     </button>
@@ -1439,33 +1563,35 @@ export default function App() {
                       onClick={() => handleClaimBonus(30, 'Stress Buster Game', 'game')}
                       className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                         gameSessionClaimed
-                          ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
+                          ? 'glass-pill text-[var(--success)] border border-[var(--success)]/40 cursor-not-allowed'
                           : gameScore >= 50
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/30 cursor-pointer animate-pulse'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          ? 'bg-[var(--success)] hover:opacity-90 text-white shadow-md shadow-emerald-500/30 cursor-pointer animate-pulse'
+                          : 'glass-pill text-[var(--text-muted)] cursor-not-allowed opacity-60'
                       }`}
                     >
                       <Sparkles className="w-3.5 h-3.5 inline mr-1" />
                       <span>{gameSessionClaimed ? 'Claimed ✓' : 'Claim +30 Pts'}</span>
                     </button>
                   </div>
-                </>
+                </div>
               )}
             </div>
           )}
 
           {/* TAB 6: PERSONAL ANALYTICS (7-Day charts and peak hours) */}
           {activeTab === 'ANALYTICS' && (
-            <DetailedAnalytics
-              theme={settings.theme}
-              userPlan={userPlan}
-              onUpgradeClick={() => openUpgradeModal('7-Day Personal Analytics')}
-            />
+            <div className="relative z-10 space-y-4">
+              <DetailedAnalytics
+                theme={settings.theme}
+                userPlan={userPlan}
+                onUpgradeClick={() => openUpgradeModal('7-Day Personal Analytics')}
+              />
+            </div>
           )}
 
           {/* TAB 7: ACHIEVEMENTS & GAMIFICATION */}
           {activeTab === 'ACHIEVEMENTS' && (
-            <div className="max-w-xl mx-auto space-y-4">
+            <div className="relative z-10 max-w-xl mx-auto space-y-4">
               <GamificationPoints
                 points={stats.points}
                 breaksCompleted={stats.breaksCompleted}
@@ -1477,7 +1603,7 @@ export default function App() {
 
           {/* TAB 8: CORPORATE HR DASHBOARD & PORTAL */}
           {activeTab === 'HR_PORTAL' && (
-            <div className="space-y-4">
+            <div className="relative z-10 space-y-4">
               <AdminDashboard
                 theme={settings.theme}
                 userPlan={userPlan}
@@ -1490,6 +1616,41 @@ export default function App() {
           </TabErrorBoundary>
         </main>
       </div>
+
+      {/* ═══════════════════════════════════════════════
+           CONFIRMATION DIALOG: Switch Active Mode
+         ═══════════════════════════════════════════════ */}
+      {confirmSwitch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="glass-panel p-6 rounded-3xl max-w-md w-full shadow-2xl space-y-4 border border-[var(--border)]">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--accent)]/20 border border-[var(--accent)]/30 text-[var(--accent)] flex items-center justify-center mx-auto">
+              <Clock className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-base font-bold text-[var(--text)]">Switch Active Timer?</h3>
+              <p className="text-sm text-[var(--text-muted)]">
+                Pause {confirmSwitch.currentMode === 'FOCUS' ? 'Focus' : confirmSwitch.currentMode === 'BREAK' ? 'Break' : 'Lunch'} and start {confirmSwitch.newMode === 'FOCUS' ? 'Focus' : confirmSwitch.newMode === 'BREAK' ? 'Break' : 'Lunch'}?
+              </p>
+            </div>
+            <div className="flex items-center space-x-3 pt-2">
+              <button
+                type="button"
+                onClick={handleCancelSwitch}
+                className="flex-1 py-2.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSwitch}
+                className="flex-1 py-2.5 rounded-xl bg-[var(--accent)] hover:opacity-90 text-[var(--accent-contrast)] text-xs font-bold shadow-lg transition-all cursor-pointer"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══════════════════════════════════════════════
            MODALS (Settings, Checkpoints & Upgrade Modal)
@@ -1505,7 +1666,11 @@ export default function App() {
         isOpen={isCheckpointOpen}
         theme={settings.theme}
         onSaveCheckpoint={handleSaveCheckpoint}
-        onSkip={startBreakSession}
+        onSkip={() => {
+          setIsCheckpointOpen(false);
+          setDisplayedMode('BREAK');
+          handleStartTimer('BREAK');
+        }}
       />
 
       <UpgradeModal

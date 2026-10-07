@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Volume2, VolumeX, ShieldAlert, Sliders, BellOff, Check, Music, Upload, Play, Sun, Moon, Utensils, Coffee } from 'lucide-react';
-import { Settings, SoundTone } from '../types';
+import { X, Sliders, Check, Music, Play, Sun, Moon, Utensils, Coffee, ShieldAlert, Activity } from 'lucide-react';
+import { Settings } from '../types';
 import { soundEngine } from '../utils/audio';
 
 interface SettingsModalProps {
@@ -32,27 +32,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const isDark = localSettings.theme === 'dark';
 
-  const handleApplyCustomMins = () => {
-    const mins = parseInt(customMinsInput, 10);
-    if (!isNaN(mins) && mins > 0) {
-      setLocalSettings((prev) => ({ ...prev, breakIntervalMins: mins }));
-    }
-  };
-
-  const handleApplyCustomBreakMins = () => {
-    const bmins = parseInt(customBreakMinsInput, 10);
-    if (!isNaN(bmins) && bmins > 0) {
-      setLocalSettings((prev) => ({ ...prev, breakDurationMins: bmins }));
-    }
-  };
-
-  const handleApplyCustomMl = () => {
-    const ml = parseInt(customMlInput, 10);
-    if (!isNaN(ml) && ml > 0) {
-      setLocalSettings((prev) => ({ ...prev, waterTargetMl: ml }));
-    }
-  };
-
   const handleSave = () => {
     const mins = parseInt(customMinsInput, 10);
     const bmins = parseInt(customBreakMinsInput, 10);
@@ -67,19 +46,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     onSaveSettings(updated);
     onClose();
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setLocalSettings({
-        ...localSettings,
-        selectedTone: 'custom',
-        customSoundUrl: url,
-        customSoundName: file.name,
-      });
-    }
   };
 
   const handleTestSound = () => {
@@ -99,17 +65,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       waterTargetMl: 2000,
       selectedTone: 'chime',
       theme: 'dark',
+      reduceMotion: false,
     };
     setLocalSettings(defaults);
     setCustomMinsInput('25');
+    setCustomBreakMinsInput('3');
     setCustomMlInput('2000');
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div
         className={`w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] border ${
-          isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+          isDark
+            ? 'bg-slate-900 border-purple-500/25 text-slate-100'
+            : 'bg-white border-purple-200 text-slate-900'
         }`}
       >
         {/* Header */}
@@ -119,14 +89,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           }`}
         >
           <div className="flex items-center space-x-2">
-            <Sliders className="w-4 h-4 text-indigo-500" />
+            <Sliders className="w-4 h-4 text-purple-500" />
             <h2 className="text-xs font-bold tracking-tight">PausePulse Settings</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             className={`p-1 rounded-lg transition-colors cursor-pointer ${
-              isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-200'
+              isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
             }`}
           >
             <X className="w-4 h-4" />
@@ -135,7 +105,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Form Body */}
         <div className="p-4 space-y-4 overflow-y-auto flex-1">
-          {/* Theme Selector */}
+          {/* Theme Selector (High-Contrast in Both Themes) */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold block">App Theme</label>
             <div className="grid grid-cols-2 gap-2">
@@ -144,11 +114,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onClick={() => setLocalSettings({ ...localSettings, theme: 'dark' })}
                 className={`flex items-center justify-center space-x-2 py-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
                   localSettings.theme === 'dark'
-                    ? 'bg-slate-950 border-indigo-500 text-white shadow-md shadow-indigo-500/20'
-                    : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:text-slate-200'
+                    ? 'bg-slate-950 border-purple-500 text-purple-300 shadow-md shadow-purple-500/20 font-bold ring-1 ring-purple-500'
+                    : isDark
+                    ? 'bg-slate-950/60 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                 }`}
               >
-                <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                <Moon className="w-3.5 h-3.5 text-purple-400" />
                 <span>Dark Mode</span>
               </button>
 
@@ -157,8 +129,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onClick={() => setLocalSettings({ ...localSettings, theme: 'light' })}
                 className={`flex items-center justify-center space-x-2 py-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
                   localSettings.theme === 'light'
-                    ? 'bg-indigo-50 border-indigo-500 text-indigo-900 shadow-md shadow-indigo-500/10 font-bold'
-                    : 'bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-purple-50 border-purple-600 text-purple-950 shadow-md shadow-purple-500/20 font-bold ring-1 ring-purple-600'
+                    : isDark
+                    ? 'bg-slate-950/60 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                 }`}
               >
                 <Sun className="w-3.5 h-3.5 text-amber-500" />
@@ -167,11 +141,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Custom Focus Session Duration with Apply Button */}
+          {/* Reduce Motion Setting */}
+          <div
+            className={`flex items-center justify-between p-2.5 rounded-xl border transition-colors ${
+              isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <Activity className="w-4 h-4 text-purple-400" />
+              <div>
+                <div className="text-xs font-semibold">Reduce Motion</div>
+                <div className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Pause 3D planet and ambient motion
+                </div>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={localSettings.reduceMotion || false}
+              onChange={(e) => setLocalSettings({ ...localSettings, reduceMotion: e.target.checked })}
+              className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
+            />
+          </div>
+
+          {/* Custom Focus Session Duration */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold">Focus Session Duration (Mins)</label>
-              <span className="text-[11px] font-mono text-indigo-500 font-bold">{localSettings.breakIntervalMins} mins</span>
+              <span className="text-[11px] font-mono text-purple-500 font-bold">{customMinsInput || localSettings.breakIntervalMins} mins</span>
             </div>
             <div className="grid grid-cols-4 gap-1.5 mb-1.5">
               {[15, 20, 25, 45].map((mins) => (
@@ -183,10 +180,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     setCustomMinsInput(mins.toString());
                   }}
                   className={`py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
-                    localSettings.breakIntervalMins === mins
-                      ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20'
+                    customMinsInput === mins.toString() || (!customMinsInput && localSettings.breakIntervalMins === mins)
+                      ? 'bg-purple-600 border-purple-500 text-white shadow-md shadow-purple-500/20'
                       : isDark
-                      ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                      ? 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
                       : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
@@ -195,25 +192,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ))}
             </div>
 
-            {/* Custom Focus Mins Input with Explicit Set Button */}
-            <div className="flex items-center space-x-1.5">
-              <input
-                type="number"
-                placeholder="Custom minutes (e.g. 50)"
-                value={customMinsInput}
-                onChange={(e) => setCustomMinsInput(e.target.value)}
-                className={`flex-1 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500 font-mono border ${
-                  isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={handleApplyCustomMins}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
-              >
-                Set Mins
-              </button>
-            </div>
+            <input
+              type="number"
+              placeholder="Custom minutes (e.g. 50)"
+              value={customMinsInput}
+              onChange={(e) => {
+                setCustomMinsInput(e.target.value);
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val) && val > 0) {
+                  setLocalSettings((prev) => ({ ...prev, breakIntervalMins: val }));
+                }
+              }}
+              className={`w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-purple-500 font-mono border ${
+                isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+              }`}
+            />
           </div>
 
           {/* Dedicated Lunch Break Duration */}
@@ -230,27 +223,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   key={lmins}
                   type="button"
                   onClick={() => setLocalSettings({ ...localSettings, lunchBreakMins: lmins })}
-                  className={`py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                  className={`py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer flex items-center justify-center gap-1 ${
                     (localSettings.lunchBreakMins || 45) === lmins
                       ? 'bg-amber-600 border-amber-500 text-white shadow-md shadow-amber-500/20 font-bold'
                       : isDark
-                      ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                      ? 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
                       : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
-                  🍱 {lmins}m Lunch
+                  <Utensils className="w-3 h-3" />
+                  <span>{lmins}m Lunch</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Micro / Rest Break Duration with Presets & Manual Custom Input */}
+          {/* Micro / Rest Break Duration with Presets */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold flex items-center gap-1">
                 <Coffee className="w-3.5 h-3.5 text-emerald-500" /> Rest Break Duration (Mins)
               </label>
-              <span className="text-[11px] font-mono text-emerald-500 font-bold">{localSettings.breakDurationMins || 3} mins</span>
+              <span className="text-[11px] font-mono text-emerald-500 font-bold">{customBreakMinsInput || localSettings.breakDurationMins || 3} mins</span>
             </div>
             <div className="grid grid-cols-4 gap-1.5 mb-1.5">
               {[2, 3, 5, 10].map((bmins) => (
@@ -262,10 +256,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     setCustomBreakMinsInput(bmins.toString());
                   }}
                   className={`py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
-                    (localSettings.breakDurationMins || 3) === bmins
+                    customBreakMinsInput === bmins.toString() || (!customBreakMinsInput && (localSettings.breakDurationMins || 3) === bmins)
                       ? 'bg-emerald-600 border-emerald-500 text-white shadow-md shadow-emerald-500/20 font-bold'
                       : isDark
-                      ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                      ? 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
                       : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
@@ -274,32 +268,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ))}
             </div>
 
-            {/* Custom Break Mins Input with Explicit Set Button */}
-            <div className="flex items-center space-x-1.5">
-              <input
-                type="number"
-                placeholder="Custom break mins (e.g. 7)"
-                value={customBreakMinsInput}
-                onChange={(e) => setCustomBreakMinsInput(e.target.value)}
-                className={`flex-1 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500 font-mono border ${
-                  isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={handleApplyCustomBreakMins}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
-              >
-                Set Break
-              </button>
-            </div>
+            <input
+              type="number"
+              placeholder="Custom break mins (e.g. 7)"
+              value={customBreakMinsInput}
+              onChange={(e) => {
+                setCustomBreakMinsInput(e.target.value);
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val) && val > 0) {
+                  setLocalSettings((prev) => ({ ...prev, breakDurationMins: val }));
+                }
+              }}
+              className={`w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500 font-mono border ${
+                isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+              }`}
+            />
           </div>
 
-          {/* Custom Daily Hydration Target with Apply Button */}
+          {/* Custom Daily Hydration Target */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold">Daily Hydration Target (ml)</label>
-              <span className="text-[11px] font-mono text-cyan-500 font-bold">{localSettings.waterTargetMl} ml</span>
+              <span className="text-[11px] font-mono text-cyan-500 font-bold">{customMlInput || localSettings.waterTargetMl} ml</span>
             </div>
             <div className="grid grid-cols-3 gap-1.5 mb-1.5">
               {[1500, 2000, 2500].map((ml) => (
@@ -311,10 +301,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     setCustomMlInput(ml.toString());
                   }}
                   className={`py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
-                    localSettings.waterTargetMl === ml
+                    customMlInput === ml.toString() || (!customMlInput && localSettings.waterTargetMl === ml)
                       ? 'bg-cyan-600 border-cyan-500 text-white shadow-md shadow-cyan-500/20'
                       : isDark
-                      ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                      ? 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
                       : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
@@ -323,40 +313,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               ))}
             </div>
 
-            {/* Custom Hydration Input with Explicit Set Button */}
-            <div className="flex items-center space-x-1.5">
-              <input
-                type="number"
-                placeholder="Custom target ml (e.g. 3000)"
-                value={customMlInput}
-                onChange={(e) => setCustomMlInput(e.target.value)}
-                className={`flex-1 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-500 font-mono border ${
-                  isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-                }`}
-              />
-              <button
-                type="button"
-                onClick={handleApplyCustomMl}
-                className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
-              >
-                Set Target
-              </button>
-            </div>
+            <input
+              type="number"
+              placeholder="Custom target ml (e.g. 3000)"
+              value={customMlInput}
+              onChange={(e) => {
+                setCustomMlInput(e.target.value);
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val) && val > 0) {
+                  setLocalSettings((prev) => ({ ...prev, waterTargetMl: val }));
+                }
+              }}
+              className={`w-full rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-500 font-mono border ${
+                isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+              }`}
+            />
           </div>
 
           {/* Sound Tone Selection */}
           <div className={`space-y-2 pt-2 border-t ${isDark ? 'border-slate-800/80' : 'border-slate-200'}`}>
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold flex items-center gap-1.5">
-                <Music className="w-3.5 h-3.5 text-cyan-500" />
+                <Music className="w-3.5 h-3.5 text-purple-400" />
                 <span>Alert Sound Tone</span>
               </label>
               <button
                 type="button"
                 onClick={handleTestSound}
-                className="flex items-center space-x-1 px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 border border-indigo-500/30 text-[11px] font-semibold transition-colors cursor-pointer"
+                className="flex items-center space-x-1 px-2 py-0.5 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border border-purple-500/30 text-[11px] font-semibold transition-colors cursor-pointer"
               >
-                <Play className="w-3 h-3 fill-indigo-400" />
+                <Play className="w-3 h-3 fill-purple-400" />
                 <span>Test Tone</span>
               </button>
             </div>
@@ -371,108 +357,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => setLocalSettings({ ...localSettings, selectedTone: t.id as SoundTone })}
-                  className={`py-1.5 px-2 text-xs font-medium rounded-lg border text-left transition-all cursor-pointer ${
+                  onClick={() => setLocalSettings({ ...localSettings, selectedTone: t.id as any })}
+                  className={`p-2 rounded-xl text-xs font-semibold border flex items-center justify-between transition-all cursor-pointer ${
                     localSettings.selectedTone === t.id
-                      ? 'bg-indigo-600/30 border-indigo-500 text-indigo-400 font-semibold'
+                      ? 'bg-purple-600/30 border-purple-500 text-purple-300 font-bold'
                       : isDark
-                      ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
-                      : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
+                      ? 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
-                  {t.name}
+                  <span>{t.name}</span>
+                  {localSettings.selectedTone === t.id && <Check className="w-3 h-3 text-purple-400" />}
                 </button>
               ))}
             </div>
-
-            {/* Upload Custom Audio File */}
-            <div className="pt-1">
-              <label
-                className={`flex items-center justify-between p-2 rounded-xl border border-dashed hover:border-indigo-500/60 cursor-pointer transition-colors ${
-                  isDark ? 'bg-slate-950 border-slate-700' : 'bg-slate-50 border-slate-300'
-                }`}
-              >
-                <div className="flex items-center space-x-2 text-xs text-slate-500">
-                  <Upload className="w-3.5 h-3.5 text-indigo-500" />
-                  <span className="truncate max-w-[200px]">
-                    {localSettings.customSoundName || 'Upload custom sound (.mp3, .wav)'}
-                  </span>
-                </div>
-                <input type="file" accept="audio/*" onChange={handleFileUpload} className="hidden" />
-              </label>
-            </div>
           </div>
 
-          {/* Toggles */}
-          <div className={`space-y-2 pt-2 border-t ${isDark ? 'border-slate-800/80' : 'border-slate-200'}`}>
-            {/* Audio Toggle */}
-            <div
-              className={`flex items-center justify-between p-2.5 rounded-xl border ${
-                isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
-              }`}
-            >
-              <div className="flex items-center space-x-2.5">
-                {localSettings.soundEnabled ? (
-                  <Volume2 className="w-4 h-4 text-cyan-500" />
-                ) : (
-                  <VolumeX className="w-4 h-4 text-slate-500" />
-                )}
-                <div>
-                  <div className="text-xs font-semibold">Sound Effects</div>
-                  <div className="text-[10px] text-slate-400">Play audio chime on alerts</div>
+          {/* Strict Mode Toggle */}
+          <div
+            className={`flex items-center justify-between p-2.5 rounded-xl border ${
+              isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+            }`}
+          >
+            <div className="flex items-center space-x-2.5">
+              <ShieldAlert className="w-4 h-4 text-amber-500" />
+              <div>
+                <div className="text-xs font-semibold">Strict Ergonomic Mode</div>
+                <div className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Force break completion prompt
                 </div>
               </div>
-              <input
-                type="checkbox"
-                checked={localSettings.soundEnabled}
-                onChange={(e) => setLocalSettings({ ...localSettings, soundEnabled: e.target.checked })}
-                className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
-              />
             </div>
-
-            {/* Meeting Auto Mute */}
-            <div
-              className={`flex items-center justify-between p-2.5 rounded-xl border ${
-                isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
-              }`}
-            >
-              <div className="flex items-center space-x-2.5">
-                <BellOff className="w-4 h-4 text-indigo-500" />
-                <div>
-                  <div className="text-xs font-semibold">Meeting Auto-Mute</div>
-                  <div className="text-[10px] text-slate-400">Suppress popups during Zoom/Teams</div>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={localSettings.autoMuteInMeetings}
-                onChange={(e) =>
-                  setLocalSettings({ ...localSettings, autoMuteInMeetings: e.target.checked })
-                }
-                className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
-              />
-            </div>
-
-            {/* Strict Mode */}
-            <div
-              className={`flex items-center justify-between p-2.5 rounded-xl border ${
-                isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
-              }`}
-            >
-              <div className="flex items-center space-x-2.5">
-                <ShieldAlert className="w-4 h-4 text-amber-500" />
-                <div>
-                  <div className="text-xs font-semibold">Strict Ergonomic Mode</div>
-                  <div className="text-[10px] text-slate-400">Force break completion prompt</div>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={localSettings.strictMode}
-                onChange={(e) => setLocalSettings({ ...localSettings, strictMode: e.target.checked })}
-                className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
-              />
-            </div>
+            <input
+              type="checkbox"
+              checked={localSettings.strictMode}
+              onChange={(e) => setLocalSettings({ ...localSettings, strictMode: e.target.checked })}
+              className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+            />
           </div>
         </div>
 
@@ -485,7 +406,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="text-xs text-slate-400 hover:text-slate-600 underline transition-colors cursor-pointer"
+            className={`text-xs underline transition-colors cursor-pointer ${
+              isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+            }`}
           >
             Reset Defaults
           </button>
@@ -494,7 +417,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               type="button"
               onClick={onClose}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
               }`}
             >
               Cancel
@@ -502,7 +425,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <button
               type="button"
               onClick={handleSave}
-              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/20 transition-all active:scale-95 cursor-pointer"
+              className="flex items-center space-x-1 px-4 py-1.5 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-500/25 transition-all active:scale-95 cursor-pointer"
             >
               <Check className="w-3.5 h-3.5" />
               <span>Save Settings</span>

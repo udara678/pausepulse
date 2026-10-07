@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart3, TrendingUp, Droplets, Clock, ShieldCheck, Lock, Sparkles, Calendar, Zap, ArrowUpRight } from 'lucide-react';
+import { BarChart3, TrendingUp, Droplets, Clock, ShieldCheck, Lock, Sparkles, Calendar, Zap, ArrowUpRight, Target } from 'lucide-react';
 import { AppTheme, UserPlan } from '../types';
 
 interface DetailedAnalyticsProps {
@@ -86,6 +86,42 @@ export const DetailedAnalytics: React.FC<DetailedAnalyticsProps> = ({
 
         {/* Content (Rendered beneath, blurred if locked) */}
         <div className={`space-y-4 ${isLocked ? 'filter blur-xs pointer-events-none opacity-60' : ''}`}>
+          {/* Featured Focus Score Card (Moved from Top Bar) */}
+          <div
+            className={`p-4 rounded-2xl border flex items-center justify-between transition-colors ${
+              isDark
+                ? 'bg-slate-900/80 border-purple-500/30 text-white backdrop-blur-md'
+                : 'bg-white/95 border-purple-200 text-slate-900 shadow-sm backdrop-blur-md'
+            }`}
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                <Target className="w-5 h-5 text-cyan-400" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">
+                  Daily Cognitive Performance
+                </span>
+                <h3 className="text-sm font-extrabold flex items-center gap-2">
+                  <span>Focus Score</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-500 font-bold border border-emerald-500/30">
+                    Optimal Focus Zone
+                  </span>
+                </h3>
+                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  Calculated from focus duration, break pacing, and anti-cheat compliance
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <div className="text-2xl font-black font-mono text-cyan-500 tracking-tight">
+                94/100
+              </div>
+              <span className="text-[10px] text-emerald-500 font-bold">+6 pts vs yesterday</span>
+            </div>
+          </div>
+
           {/* Key Stat Highlights */}
           <div className="grid grid-cols-4 gap-2.5">
             <div

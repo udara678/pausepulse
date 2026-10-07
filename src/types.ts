@@ -55,6 +55,17 @@ export const PLAN_LIMITS: Record<UserPlan, PlanFeatureLimits> = {
   },
 };
 
+export type TimerStatus = 'idle' | 'running' | 'paused';
+
+export interface ModeTimerState {
+  durationSec: number;
+  endTimestamp: number | null;
+  remainingSec: number;
+  status: TimerStatus;
+}
+
+export type AllTimersState = Record<TimerMode, ModeTimerState>;
+
 export interface Settings {
   hydrationIntervalMins: number;
   breakIntervalMins: number;      // Focus session duration (e.g., 25 mins)
@@ -67,6 +78,7 @@ export interface Settings {
   waterTargetMl: number;
   selectedTone: SoundTone;
   theme: AppTheme;
+  reduceMotion: boolean;          // Pauses 3D planet animation
   customSoundUrl?: string;
   customSoundName?: string;
 }
