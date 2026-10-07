@@ -37,6 +37,8 @@ import { LicenseGate } from './components/LicenseGate';
 import { UpgradeModal } from './components/UpgradeModal';
 import { DetailedAnalytics } from './components/DetailedAnalytics';
 import { Glass3DBackground } from './components/Glass3DBackground';
+import { GlobeCollection } from '@designcodeio/threeui';
+import '@designcodeio/threeui/style.css';
 
 const TRIAL_STARTED_KEY = 'pausepulse_trial_started';
 const LICENSE_KEY_STORE = 'pausepulse_license';
@@ -510,13 +512,26 @@ export default function App() {
       }`}
     >
       {/* ═══════════════════════════════════════════════
-           3D GLASS ETHEREAL BACKGROUND (Three.js)
+           THREEUI ENERGY ORB 3D BACKGROUND
          ═══════════════════════════════════════════════ */}
-      <Glass3DBackground
-        breathPhase={breathPhase}
-        isBreathingActive={isBreathingActive}
-        theme={settings.theme}
-      />
+      <div className="shader-frame absolute inset-0 pointer-events-none z-0 overflow-hidden">
+        <GlobeCollection
+          variant="energy-orb"
+          speed={isBreathingActive ? 1.40 : 1.00}
+          scale={1.00}
+          smokeScale={1.00}
+          smokeStrength={1.00}
+          smokeSpeed={1.00}
+          hue={0}
+          saturation={1.00}
+          glow={1.00}
+          starDensity={1.00}
+          starSpeed={1.00}
+          starSize={1.00}
+          brightness={isDark ? 1.00 : 0.85}
+          opacity={isDark ? 0.95 : 0.65}
+        />
+      </div>
       {/* ═══════════════════════════════════════════════
            TOP TITLE BAR (Mac Traffic Lights + Search + Plan Pill + Controls)
          ═══════════════════════════════════════════════ */}
