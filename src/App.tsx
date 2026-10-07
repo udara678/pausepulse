@@ -1025,7 +1025,7 @@ export default function App() {
             />
           </div>
 
-          <TabErrorBoundary onReset={() => setActiveTab('TIMER')}>
+          <TabErrorBoundary key={activeTab} onReset={() => setActiveTab('TIMER')}>
             {/* TAB 1: FOCUS TIMER */}
             {activeTab === 'TIMER' && (
               <div className="relative z-10 flex-1 flex flex-col justify-between items-center w-full max-w-2xl mx-auto py-2 my-auto">
