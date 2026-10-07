@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, Droplets, Clock, ShieldCheck, Lock, Sparkles, Calendar, Zap, ArrowUpRight, Target } from 'lucide-react';
 import { AppTheme, UserPlan } from '../types';
 
