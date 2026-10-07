@@ -275,8 +275,94 @@ export const DetailedAnalytics: React.FC<DetailedAnalyticsProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Most Helpful Activities (from Mood Coach activity history) */}
+          <MostHelpfulActivities isDark={isDark} />
         </div>
       </div>
     </div>
   );
 };
+
+interface ActivityLogItem {
+  id: string;
+  moodId: string;
+  activityId: string;
+  activityTitle: string;
+  timestamp: number;
+}
+
+const MostHelpfulActivities: React.FC<{ isDark: boolean }> = ({ isDark }) => {
+  const [activities, setActivities] = useState<{ title: string; count: number }[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('pausepulse_activity_history');
+      if (raw) {
+        const logs: ActivityLogItem[] = JSON.parse(raw);
+        const counts: Record<string, number> = {};
+        logs.forEach((l) => {
+          counts[l.activityTitle] = (counts[l.activityTitle] || 0) + 1;
+        });
+        const sorted = Object.entries(counts)
+          .map(([title, count]) => ({ title, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+        if (sorted.length > 0) {
+          setActivities(sorted);
+          return;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
+    // Default sample data if no history yet
+    setActivities([
+      { title: '3-Phase Breathing', count: 12 },
+      { title: 'Desk Stretch', count: 9 },
+      { title: 'Grounding 5-4-3-2-1', count: 7 },
+      { title: 'Brain Dump', count: 5 },
+      { title: 'Eye Rest 20-20-20', count: 4 },
+    ]);
+  }, []);
+
+  const maxCount = Math.max(...activities.map((a) => a.count), 1);
+
+  return (
+    <div
+      className={`p-4 rounded-2xl border space-y-3 ${
+        isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-[var(--text)] flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
+          Most Helpful Activities
+        </span>
+        <span className="text-[11px] text-[var(--text-muted)]">From Mood Coach completions</span>
+      </div>
+
+      <div className="space-y-2">
+        {activities.map((act) => {
+          const pct = Math.round((act.count / maxCount) * 100);
+          return (
+            <div key={act.title} className="text-xs">
+              <div className="flex justify-between text-[11px] mb-1">
+                <span className="text-[var(--text)] font-medium">{act.title}</span>
+                <span className="font-bold text-[var(--accent)] font-mono">{act.count} completed</span>
+              </div>
+              <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-[var(--accent)] to-[var(--hydration)] rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+

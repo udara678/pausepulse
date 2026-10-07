@@ -81,6 +81,15 @@ export interface Settings {
   reduceMotion: boolean;          // Pauses 3D planet animation
   customSoundUrl?: string;
   customSoundName?: string;
+  eapHelplineUrl?: string;        // Configurable Employee Assistance / Helpline URL
+}
+
+export interface CompletedActivityLog {
+  id: string;
+  moodId: string;
+  activityId: string;
+  activityTitle: string;
+  timestamp: number;
 }
 
 declare global {

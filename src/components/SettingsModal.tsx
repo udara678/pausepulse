@@ -395,6 +395,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
             />
           </div>
+
+          {/* EAP / Helpline URL */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold block">
+              EAP / Support Helpline URL
+              <span className={`ml-1.5 text-[10px] font-normal ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                (shown in "Need more support?" link)
+              </span>
+            </label>
+            <input
+              type="url"
+              value={localSettings.eapHelplineUrl ?? ''}
+              onChange={(e) => setLocalSettings({ ...localSettings, eapHelplineUrl: e.target.value || undefined })}
+              placeholder="https://your-eap-provider.com"
+              className={`w-full px-3 py-2 rounded-xl border text-xs transition-colors outline-none focus:ring-1 focus:ring-[var(--accent)] ${
+                isDark
+                  ? 'bg-slate-950 border-slate-800 text-slate-200 placeholder-slate-600'
+                  : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+              }`}
+            />
+          </div>
         </div>
 
         {/* Footer Actions */}

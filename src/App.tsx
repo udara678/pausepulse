@@ -37,6 +37,8 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { LicenseGate } from './components/LicenseGate';
 import { UpgradeModal } from './components/UpgradeModal';
 import { DetailedAnalytics } from './components/DetailedAnalytics';
+import { MoodCoach } from './components/MoodCoach';
+import { CompletedActivityLog } from './types';
 import { GlobeCollection } from '@designcodeio/threeui';
 import '@designcodeio/threeui/style.css';
 
@@ -692,6 +694,22 @@ export default function App() {
     if (claimType === 'game') setGameSessionClaimed(true);
   };
 
+  const handleLogActivity = (log: Omit<CompletedActivityLog, 'id'>) => {
+    try {
+      const existing = localStorage.getItem('pausepulse_activity_history');
+      const list: CompletedActivityLog[] = existing ? JSON.parse(existing) : [];
+      const newEntry: CompletedActivityLog = {
+        id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        ...log,
+      };
+      list.unshift(newEntry);
+      // Keep last 100 entries
+      localStorage.setItem('pausepulse_activity_history', JSON.stringify(list.slice(0, 100)));
+    } catch (e) {
+      console.error('Failed to save activity log:', e);
+    }
+  };
+
   // Helper formatting
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
@@ -1286,124 +1304,24 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 3: MOOD COACH (With Plan Gating) */}
+          {/* TAB 3: UPGRADED MOOD COACH */}
           {activeTab === 'MOOD' && (
-            <div className="max-w-2xl mx-auto space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
-                    <span>How are you feeling right now?</span>
-                    {!PLAN_LIMITS[userPlan].fullMoodCoach && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                        Free Trial: 2 Moods Unlocked
-                      </span>
-                    )}
-                  </h2>
-                  <p className="text-xs text-slate-400">Select your current mental/physical state for targeted micro-activities</p>
-                </div>
-
-                {!PLAN_LIMITS[userPlan].fullMoodCoach && (
-                  <button
-                    type="button"
-                    onClick={() => openUpgradeModal('Full Mood Coach (All 6 Moods)')}
-                    className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
-                  >
-                    <Crown className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Unlock all 6 Moods (Pro)</span>
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {MOOD_DATA.map((m) => {
-                  const isLockedMood = m.proOnly && !PLAN_LIMITS[userPlan].fullMoodCoach;
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => {
-                        if (isLockedMood) {
-                          openUpgradeModal(`Mood: ${m.label}`);
-                          return;
-                        }
-                        setSelectedMood(m);
-                        setGuidedTimerSecs(m.durationSecs);
-                        setIsGuidedRunning(false);
-                        setGuidedCompleted(false);
-                        setMoodActivityClaimed(false); // reset claim for new mood
-                      }}
-                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative ${
-                        selectedMood.id === m.id && !isLockedMood
-                          ? 'bg-indigo-600/30 border-indigo-500 shadow-md shadow-indigo-500/20'
-                          : isLockedMood
-                          ? 'bg-slate-900/40 border-slate-800/80 opacity-70 hover:opacity-100 hover:border-indigo-500/50'
-                          : isDark
-                          ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
-                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      {isLockedMood && (
-                        <div className="absolute top-2 right-2 text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                          <Lock className="w-2.5 h-2.5" />
-                          <span>Pro</span>
-                        </div>
-                      )}
-
-                      <div className="text-2xl mb-1">{m.emoji}</div>
-                      <div className="text-xs font-bold text-white">{m.label}</div>
-                      <div className="text-[10px] text-slate-400">{m.desc}</div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Targeted Recommendation Box */}
-              <div
-                className={`p-4 rounded-2xl border space-y-3 ${
-                  isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
-                      Recommended Micro-Activity
-                    </span>
-                    <h3 className="text-sm font-bold text-white mt-0.5">{selectedMood.recommended}</h3>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-xs font-bold text-cyan-400 font-mono">{formatTime(guidedTimerSecs)}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 pt-2 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setIsGuidedRunning(!isGuidedRunning)}
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center space-x-1.5 cursor-pointer"
-                  >
-                    {isGuidedRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                    <span>{isGuidedRunning ? 'Pause Activity' : `Start ${selectedMood.durationSecs}s Exercise`}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={!guidedCompleted || moodActivityClaimed}
-                    onClick={() => handleClaimBonus(30, selectedMood.recommended, 'mood')}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                      moodActivityClaimed
-                        ? 'bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-not-allowed'
-                        : guidedCompleted
-                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-500/30 cursor-pointer animate-pulse'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}
-                  >
-                    <Sparkles className="w-3.5 h-3.5 inline mr-1" />
-                    <span>{moodActivityClaimed ? 'Claimed ✓' : 'Claim +30 Bonus Pts'}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
+            <MoodCoach
+              theme={settings.theme}
+              userPlan={userPlan}
+              soundEnabled={settings.soundEnabled}
+              onClaimPoints={(pts, label) => handleClaimBonus(pts, label, 'mood')}
+              onLogActivity={handleLogActivity}
+              onNavigateTo={(tab, action) => {
+                setActiveTab(tab as any);
+                if (tab === 'TIMER' && action === 'start_focus') {
+                  handleStartTimer('FOCUS');
+                }
+              }}
+              onAddWater={handleAddWater}
+              eapHelplineUrl={settings.eapHelplineUrl}
+              onOpenUpgrade={openUpgradeModal}
+            />
           )}
 
           {/* TAB 4: BREATHING EXERCISE (3-Phase: Inhale -> Hold -> Exhale) */}
