@@ -905,7 +905,7 @@ export default function App() {
                 id: 'MOOD',
                 icon: Smile,
                 label: 'Mood Coach',
-                badge: PLAN_LIMITS[userPlan].fullMoodCoach ? '6 Moods' : '2 Basic',
+                badge: PLAN_LIMITS[userPlan].fullMoodCoach ? '9 Moods' : '3 Free',
               },
               { id: 'BREATHING', icon: Heart, label: 'Breathing', badge: '3-Phase' },
               {

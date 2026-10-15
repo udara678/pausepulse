@@ -157,7 +157,6 @@ export function BrainDump({ onComplete }: Props) {
           // focus ring via Tailwind focus:ring uses accent
           // We'll override focus ring color via inline style trick
         }}
-        // @ts-expect-error - custom CSS property
         onFocus={(e) => (e.currentTarget.style.outline = `2px solid var(--accent)`)}
         onBlur={(e) => (e.currentTarget.style.outline = 'none')}
         autoFocus
