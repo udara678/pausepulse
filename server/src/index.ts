@@ -1,6 +1,7 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import helmet from 'helmet';
+import { env } from './config/env';
 
 import authRoutes from './routes/auth';
 import syncRoutes from './routes/sync';
@@ -9,19 +10,69 @@ import hrRoutes from './routes/hr';
 import billingRoutes from './routes/billing';
 import stripeRoutes from './routes/stripe';
 import licenseRoutes from './routes/license';
-
-dotenv.config();
+import { globalLimiter } from './middleware/rateLimiter';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = env.PORT;
 
-app.use(cors());
+// ─── 1. HTTP Security Headers (OWASP A05:2021) ─────────────────────────────
+app.disable('x-powered-by'); // Prevent Express banner disclosure
 
-// ⚠️ Stripe webhook must use raw body BEFORE express.json()
-app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
-app.use(express.json());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.tailwindcss.com'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'", 'http://localhost:5000', 'http://localhost:5173'],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"], // Anti-Clickjacking
+      },
+    },
+    crossOriginEmbedderPolicy: false, // Compatibility for desktop/embedded preview
+  })
+);
 
-// REST API Routes
+// ─── 2. CORS Hardening ─────────────────────────────────────────────────────
+const allowedOrigins = env.CORS_ORIGIN.split(',').map((o) => o.trim());
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g. Electron file:// or curl in dev)
+      if (!origin) return callback(null, true);
+
+      if (
+        allowedOrigins.includes(origin) ||
+        env.NODE_ENV === 'development' ||
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('http://127.0.0.1:')
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error('Blocked by CORS policy: Origin not allowed'));
+      }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature'],
+    credentials: true,
+    maxAge: 86400, // 24 hours preflight cache
+  })
+);
+
+// ─── 3. Body Parsers (with size limits to prevent DoS) ──────────────────────
+// Stripe webhook requires raw body BEFORE express.json()
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }));
+app.use(express.json({ limit: '100kb' })); // Max payload 100kb prevents memory exhaustion DoS
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+
+// ─── 4. Rate Limiting ──────────────────────────────────────────────────────
+app.use('/api/', globalLimiter);
+
+// ─── 5. API Routes ─────────────────────────────────────────────────────────
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/sync', syncRoutes);
 app.use('/api/v1/leaderboard', leaderboardRoutes);
@@ -30,18 +81,17 @@ app.use('/api/v1/billing', billingRoutes);
 app.use('/api/v1/license', licenseRoutes);
 app.use('/api/stripe', stripeRoutes);
 
-
-// Health check
-app.get('/health', (_req, res) => {
+// Health check endpoint (anonymized, no server internal environment dumped)
+app.get('/health', (_req: Request, res: Response) => {
   res.json({
-    status: 'online',
-    service: 'PausePulse Cloud Backend API',
+    status: 'healthy',
+    uptime: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
   });
 });
 
-// Admin Web Page with Guaranteed Direct CSS Theme Toggle (http://localhost:5000/admin)
-app.get('/admin', (_req, res) => {
+// ─── 6. Hardened Admin Dashboard (XSS Sanitized) ───────────────────────────
+app.get('/admin', (_req: Request, res: Response) => {
   res.send(`
 <!DOCTYPE html>
 <html lang="en">
@@ -70,7 +120,6 @@ app.get('/admin', (_req, res) => {
       </div>
 
       <div class="flex items-center space-x-2">
-        <!-- Theme Toggle Button -->
         <button id="theme-btn" onclick="toggleTheme()" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer">
           🌙 Dark Mode
         </button>
@@ -126,7 +175,7 @@ app.get('/admin', (_req, res) => {
       </div>
 
       <div id="rewards-list" class="space-y-2">
-        <!-- Dynamic Rewards -->
+        <!-- Dynamic Rewards sanitized via textContent -->
       </div>
     </div>
 
@@ -139,6 +188,13 @@ app.get('/admin', (_req, res) => {
 
   <script>
     let currentTheme = localStorage.getItem('pausepulse_admin_theme') || 'dark';
+
+    // XSS Sanitizer Helper
+    function escapeHTML(str) {
+      const p = document.createElement('p');
+      p.appendChild(document.createTextNode(str));
+      return p.innerHTML;
+    }
 
     function applyTheme() {
       const isLight = currentTheme === 'light';
@@ -197,21 +253,21 @@ app.get('/admin', (_req, res) => {
         const res = await fetch('/api/v1/hr/dashboard');
         const data = await res.json();
         
-        document.getElementById('wellness-score').innerText = data.teamWellnessScore + '%';
-        document.getElementById('active-seats').innerText = data.activeSeats + ' / ' + data.totalSeats;
-        document.getElementById('avg-hydration').innerText = data.monthlyHydrationAvgMl + ' ml';
-        document.getElementById('total-breaks').innerText = data.anonymizedStats.totalBreaksCompletedThisMonth;
+        document.getElementById('wellness-score').textContent = data.teamWellnessScore + '%';
+        document.getElementById('active-seats').textContent = data.activeSeats + ' / ' + data.totalSeats;
+        document.getElementById('avg-hydration').textContent = data.monthlyHydrationAvgMl + ' ml';
+        document.getElementById('total-breaks').textContent = data.anonymizedStats.totalBreaksCompletedThisMonth;
 
         const list = document.getElementById('rewards-list');
         const isLight = currentTheme === 'light';
         list.innerHTML = data.rewardsActive.map(r => \`
           <div class="flex items-center justify-between p-3 rounded-xl border" style="background-color: \${isLight ? '#f8fafc' : '#020617'}; border-color: \${isLight ? '#e2e8f0' : '#1e293b'}">
             <div>
-              <div class="text-xs font-bold" style="color: \${isLight ? '#0f172a' : '#ffffff'}">\${r.title}</div>
-              <div class="text-[10px] text-slate-400">Type: \${r.type}</div>
+              <div class="text-xs font-bold" style="color: \${isLight ? '#0f172a' : '#ffffff'}">\${escapeHTML(r.title)}</div>
+              <div class="text-[10px] text-slate-400">Type: \${escapeHTML(r.type)}</div>
             </div>
             <span class="text-xs font-mono font-bold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
-              \${r.pointsRequired} pts
+              \${parseInt(r.pointsRequired, 10)} pts
             </span>
           </div>
         \`).join('');
@@ -228,12 +284,42 @@ app.get('/admin', (_req, res) => {
   `);
 });
 
-// Root Redirect to /admin
-app.get('/', (_req, res) => {
+app.get('/', (_req: Request, res: Response) => {
   res.redirect('/admin');
 });
 
-app.listen(PORT, () => {
-  console.log(`⚡ PausePulse Backend API Server running on http://localhost:${PORT}`);
-  console.log(`📊 Admin Web Dashboard UI available at http://localhost:${PORT}/admin`);
+// ─── 7. Global 404 Handler ─────────────────────────────────────────────────
+app.use('/api/*', (_req: Request, res: Response) => {
+  res.status(404).json({ error: 'Endpoint not found.' });
+});
+
+// ─── 8. Global Error Handler (Prevents Stack Trace Leakage) ─────────────────
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[Unhandled Server Error]:', err);
+
+  if (err.message && err.message.includes('CORS')) {
+    res.status(403).json({ error: 'CORS forbidden: Access denied for this origin.' });
+    return;
+  }
+
+  // Strictly generic error message prevents leaking internal database/runtime details
+  res.status(err.status || 500).json({
+    error: 'Internal server error. Please contact system support.',
+  });
+});
+
+const server = app.listen(PORT, () => {
+  console.log(`🛡️ PausePulse Hardened Server running on port ${PORT}`);
+  console.log(`🔒 Security active: Helmet CSP, Rate Limiting, CORS, DTO Whitelisting`);
+});
+
+// Graceful termination
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  server.close(() => process.exit(0));
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received. Shutting down gracefully...');
+  server.close(() => process.exit(0));
 });
