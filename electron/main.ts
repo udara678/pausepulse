@@ -31,12 +31,14 @@ function createWindow() {
   });
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173').catch(() => {
-      // If vite is still starting, retry after 1s
-      setTimeout(() => {
-        mainWindow?.loadURL('http://localhost:5173');
-      }, 1500);
-    });
+    const tryLoad = (retries = 20) => {
+      mainWindow?.loadURL('http://localhost:5173').catch(() => {
+        if (retries > 0) {
+          setTimeout(() => tryLoad(retries - 1), 1000);
+        }
+      });
+    };
+    tryLoad();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
