@@ -264,10 +264,12 @@ export default function App() {
   const [isGuidedRunning, setIsGuidedRunning] = useState<boolean>(false);
   const [guidedCompleted, setGuidedCompleted] = useState<boolean>(false);
 
-  // One-time claim flags — reset when activity resets/restarts
+  // One-time claim flags per break session
   const [moodActivityClaimed, setMoodActivityClaimed] = useState<boolean>(false);
   const [breathSessionClaimed, setBreathSessionClaimed] = useState<boolean>(false);
   const [gameSessionClaimed, setGameSessionClaimed] = useState<boolean>(false);
+  // Increments on each completed Focus session to automatically reset all break activity claim points
+  const [sessionEpoch, setSessionEpoch] = useState<number>(0);
 
   // Plan selection / upgrade handler
   const handleSelectPlan = (newPlan: UserPlan) => {
@@ -376,8 +378,48 @@ export default function App() {
         points: prev.points + 25,
         activeMinutes: prev.activeMinutes + Math.round(timers.FOCUS.durationSec / 60),
       }));
+
+      // Automatically reset timers: Focus back to duration, Break back to duration & idle
+      setTimers((prev) => {
+        const next: AllTimersState = {
+          ...prev,
+          FOCUS: {
+            ...prev.FOCUS,
+            status: 'idle',
+            endTimestamp: null,
+            remainingSec: prev.FOCUS.durationSec,
+          },
+          BREAK: {
+            ...prev.BREAK,
+            status: 'idle',
+            endTimestamp: null,
+            remainingSec: prev.BREAK.durationSec,
+          },
+        };
+        try {
+          localStorage.setItem(TIMERS_STORAGE_KEY, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      // Automatically reset Break Claim button for this new break session
       setBreakCompleted(false);
       setBreakClaimed(false);
+
+      // Automatically reset 3-Phase Guided Breathing activity & claim button
+      setBreathSessionClaimed(false);
+      setBreathCycles(0);
+      setBreathSecs(4);
+      setBreathPhase('INHALE');
+      setIsBreathingActive(false);
+
+      // Automatically reset Stress Buster mini game & claim button
+      setGameSessionClaimed(false);
+      resetBubbleGame();
+
+      // Automatically reset Mood Coach activities & claim buttons
+      setMoodActivityClaimed(false);
+      setSessionEpoch((prev) => prev + 1);
     } else if (completedMode === 'BREAK') {
       setBreakCompleted(true);
       window.electronAPI?.sendNotification?.('Break Finished! 🎉', 'Ready to dive back into focused work?');
@@ -1306,6 +1348,7 @@ export default function App() {
           {/* TAB 3: UPGRADED MOOD COACH */}
           {activeTab === 'MOOD' && (
             <MoodCoach
+              key={sessionEpoch}
               theme={settings.theme}
               userPlan={userPlan}
               soundEnabled={settings.soundEnabled}
