@@ -17,6 +17,7 @@ type Phase = 'idle' | 'running' | 'done';
 export function EyeRest({ onComplete }: EyeRestProps) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [timeLeft, setTimeLeft] = useState(DURATION);
+  const [claimed, setClaimed] = useState(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -57,7 +58,10 @@ export function EyeRest({ onComplete }: EyeRestProps) {
   };
 
   const handleClaim = () => {
-    onComplete('eye-rest-20-20-20');
+    if (!claimed) {
+      setClaimed(true);
+      onComplete('eye-rest-20-20-20');
+    }
   };
 
   const progress = (DURATION - timeLeft) / DURATION;
@@ -79,13 +83,16 @@ export function EyeRest({ onComplete }: EyeRestProps) {
         </div>
         <button
           onClick={handleClaim}
+          disabled={claimed}
           className="px-6 py-3 rounded-xl font-semibold text-sm transition-all"
           style={{
-            background: 'var(--accent)',
-            color: 'var(--accent-contrast)',
+            background: claimed ? 'var(--surface-2)' : 'var(--accent)',
+            color: claimed ? 'var(--success)' : 'var(--accent-contrast)',
+            border: claimed ? '1px solid var(--success)' : 'none',
+            cursor: claimed ? 'not-allowed' : 'pointer',
           }}
         >
-          Claim +30 pts
+          {claimed ? 'Claimed ✓' : 'Claim +30 pts'}
         </button>
       </div>
     );

@@ -63,6 +63,7 @@ export function Grounding54321({ onComplete }: Props) {
   const [currentStep, setCurrentStep] = useState(0);
   const [timeLeft, setTimeLeft] = useState(STEP_DURATION);
   const [completed, setCompleted] = useState(false);
+  const [claimed, setClaimed] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearTimer = () => {
@@ -128,14 +129,22 @@ export function Grounding54321({ onComplete }: Props) {
           ))}
         </div>
         <button
-          onClick={() => onComplete('grounding-54321')}
-          className="mt-2 px-8 py-3 rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 active:opacity-75"
+          onClick={() => {
+            if (!claimed) {
+              setClaimed(true);
+              onComplete('grounding-54321');
+            }
+          }}
+          disabled={claimed}
+          className="mt-2 px-8 py-3 rounded-xl font-semibold text-sm transition-all"
           style={{
-            background: 'var(--accent)',
-            color: 'var(--accent-contrast)',
+            background: claimed ? 'var(--surface-2)' : 'var(--accent)',
+            color: claimed ? 'var(--success)' : 'var(--accent-contrast)',
+            border: claimed ? '1px solid var(--success)' : 'none',
+            cursor: claimed ? 'not-allowed' : 'pointer',
           }}
         >
-          Claim +30 pts
+          {claimed ? 'Claimed ✓' : 'Claim +30 pts'}
         </button>
       </div>
     );

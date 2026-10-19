@@ -12,6 +12,7 @@ export function TaskTriage({ onComplete }: TaskTriageProps) {
   const [stage, setStage] = useState<Stage>('list');
   const [rawText, setRawText] = useState('');
   const [picked, setPicked] = useState<string>('');
+  const [claimed, setClaimed] = useState(false);
 
   const tasks = rawText
     .split('\n')
@@ -159,15 +160,23 @@ export function TaskTriage({ onComplete }: TaskTriageProps) {
           </p>
 
           <button
-            onClick={() => onComplete('task-triage')}
+            onClick={() => {
+              if (!claimed) {
+                setClaimed(true);
+                onComplete('task-triage');
+              }
+            }}
+            disabled={claimed}
             className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all"
             style={{
-              background: 'var(--accent)',
-              color: 'var(--accent-contrast)',
+              background: claimed ? 'var(--surface-2)' : 'var(--accent)',
+              color: claimed ? 'var(--success)' : 'var(--accent-contrast)',
+              border: claimed ? '1px solid var(--success)' : 'none',
+              cursor: claimed ? 'not-allowed' : 'pointer',
             }}
           >
             <CheckCircle2 size={16} />
-            Claim +30 pts
+            {claimed ? 'Claimed ✓' : 'Claim +30 pts'}
           </button>
 
           <button

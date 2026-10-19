@@ -31,6 +31,7 @@ export function WalkTimer({ onComplete }: WalkTimerProps) {
   const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS);
   const [running, setRunning] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [claimed, setClaimed] = useState(false);
   const [tipIndex, setTipIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -198,14 +199,21 @@ export function WalkTimer({ onComplete }: WalkTimerProps) {
         {/* Claim points */}
         {completed && (
           <button
-            onClick={() => onComplete("walk-timer")}
-            style={{
-              background: "var(--accent)",
-              color: "var(--accent-contrast)",
+            onClick={() => {
+              if (claimed) return;
+              setClaimed(true);
+              onComplete("walk-timer");
             }}
-            className="rounded-full px-6 py-2.5 font-semibold hover:opacity-90 transition-opacity"
+            disabled={claimed}
+            style={{
+              background: claimed ? "var(--surface-2)" : "var(--accent)",
+              color: claimed ? "var(--success)" : "var(--accent-contrast)",
+              border: claimed ? "1px solid var(--success)" : "none",
+              cursor: claimed ? "not-allowed" : "pointer",
+            }}
+            className="rounded-full px-6 py-2.5 font-semibold transition-opacity"
           >
-            Claim +30 pts
+            {claimed ? "Claimed ✓" : "Claim +30 pts"}
           </button>
         )}
       </div>

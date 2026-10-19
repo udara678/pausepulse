@@ -15,6 +15,7 @@ export function BrainDump({ onComplete }: Props) {
   const [text, setText] = useState('');
   const [timeLeft, setTimeLeft] = useState(TOTAL_SECONDS);
   const [completed, setCompleted] = useState(false);
+  const [claimed, setClaimed] = useState(false);
   const [typingMs, setTypingMs] = useState(0); // milliseconds user has typed
   const [doneEnabled, setDoneEnabled] = useState(false);
 
@@ -66,8 +67,11 @@ export function BrainDump({ onComplete }: Props) {
   const handleClear = () => setText('');
 
   const handleClaimAndClear = () => {
-    setText('');
-    onComplete('brain-dump');
+    if (!claimed) {
+      setClaimed(true);
+      setText('');
+      onComplete('brain-dump');
+    }
   };
 
   const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
@@ -97,13 +101,16 @@ export function BrainDump({ onComplete }: Props) {
         </div>
         <button
           onClick={handleClaimAndClear}
-          className="px-8 py-3 rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 active:opacity-75"
+          disabled={claimed}
+          className="px-8 py-3 rounded-xl font-semibold text-sm transition-all"
           style={{
-            background: 'var(--accent)',
-            color: 'var(--accent-contrast)',
+            background: claimed ? 'var(--surface-2)' : 'var(--accent)',
+            color: claimed ? 'var(--success)' : 'var(--accent-contrast)',
+            border: claimed ? '1px solid var(--success)' : 'none',
+            cursor: claimed ? 'not-allowed' : 'pointer',
           }}
         >
-          Clear &amp; Claim +30 pts
+          {claimed ? 'Claimed ✓' : 'Clear & Claim +30 pts'}
         </button>
       </div>
     );

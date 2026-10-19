@@ -12,6 +12,7 @@ export function KudosNote({ onComplete }: KudosNoteProps) {
   const [recipient, setRecipient] = useState('');
   const [message, setMessage] = useState('');
   const [copied, setCopied] = useState(false);
+  const [claimed, setClaimed] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
   const charsLeft = MAX_CHARS - message.length;
@@ -169,19 +170,25 @@ export function KudosNote({ onComplete }: KudosNoteProps) {
 
       {/* Claim button */}
       <button
-        onClick={() => onComplete('kudos-note')}
-        disabled={!canClaim}
+        onClick={() => {
+          if (canClaim && !claimed) {
+            setClaimed(true);
+            onComplete('kudos-note');
+          }
+        }}
+        disabled={!canClaim || claimed}
         className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         style={{
-          background: canClaim ? 'var(--accent)' : 'var(--surface-2)',
-          color: canClaim ? 'var(--accent-contrast)' : 'var(--text-muted)',
+          background: claimed ? 'var(--surface-2)' : canClaim ? 'var(--accent)' : 'var(--surface-2)',
+          color: claimed ? 'var(--success)' : canClaim ? 'var(--accent-contrast)' : 'var(--text-muted)',
+          border: claimed ? '1px solid var(--success)' : 'none',
         }}
       >
         <CheckCircle2 size={16} />
-        Claim +30 pts
+        {claimed ? 'Claimed ✓' : 'Claim +30 pts'}
       </button>
 
-      {!canClaim && (
+      {!canClaim && !claimed && (
         <p className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>
           {!bothFilled
             ? 'Fill in both fields to continue'

@@ -376,6 +376,8 @@ export default function App() {
         points: prev.points + 25,
         activeMinutes: prev.activeMinutes + Math.round(timers.FOCUS.durationSec / 60),
       }));
+      setBreakCompleted(false);
+      setBreakClaimed(false);
     } else if (completedMode === 'BREAK') {
       setBreakCompleted(true);
       window.electronAPI?.sendNotification?.('Break Finished! 🎉', 'Ready to dive back into focused work?');
@@ -418,7 +420,6 @@ export default function App() {
       soundEngine.playTone(settings.selectedTone, settings.customSoundUrl);
       window.electronAPI?.sendNotification?.('Break Time Started! 🧘', `Take a ${Math.round(timers.BREAK.durationSec / 60)}-minute break now!`);
       setBreakCompleted(false);
-      setBreakClaimed(false);
     } else if (modeToStart === 'LUNCH') {
       soundEngine.playTone(settings.selectedTone, settings.customSoundUrl);
       window.electronAPI?.sendNotification?.('Lunch Break Started 🍽️', `Enjoy your ${Math.round(timers.LUNCH.durationSec / 60)}-minute meal break!`);
@@ -482,7 +483,6 @@ export default function App() {
 
     if (newMode === 'BREAK') {
       setBreakCompleted(false);
-      setBreakClaimed(false);
     }
 
     setConfirmSwitch(null);
@@ -535,7 +535,6 @@ export default function App() {
     });
     if (modeToReset === 'BREAK') {
       setBreakCompleted(false);
-      setBreakClaimed(false);
     }
   };
 
@@ -1387,7 +1386,6 @@ export default function App() {
                     setBreathPhase('INHALE');
                     setBreathSecs(4);
                     setBreathCycles(0);
-                    setBreathSessionClaimed(false); // allow new claim after reset
                   }}
                   className="px-4 py-2.5 rounded-xl text-xs font-bold border border-[var(--border)] glass-pill text-[var(--text)] hover:bg-[var(--surface-2)] transition-all cursor-pointer"
                 >
@@ -1468,7 +1466,6 @@ export default function App() {
                       type="button"
                       onClick={() => {
                         resetBubbleGame();
-                        setGameSessionClaimed(false); // allow new claim after reset
                       }}
                       className="px-4 py-2 rounded-xl glass-pill border border-[var(--border)] text-[var(--text)] text-xs font-semibold cursor-pointer hover:bg-[var(--surface-2)]"
                     >

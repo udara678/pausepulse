@@ -67,6 +67,7 @@ export function DeskStretch({ onComplete }: DeskStretchProps) {
   const [running, setRunning] = useState(true);
   const [skipped, setSkipped] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [claimed, setClaimed] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -130,7 +131,8 @@ export function DeskStretch({ onComplete }: DeskStretchProps) {
   };
 
   const handleClaim = () => {
-    if (!skipped) {
+    if (!skipped && !claimed) {
+      setClaimed(true);
       onComplete('desk-stretch');
     }
   };
@@ -168,16 +170,16 @@ export function DeskStretch({ onComplete }: DeskStretchProps) {
             onClick={handleClaim}
             onMouseEnter={() => skipped && setShowTooltip(true)}
             onMouseLeave={() => setShowTooltip(false)}
-            disabled={skipped}
+            disabled={skipped || claimed}
             className="px-6 py-3 rounded-xl font-semibold text-sm transition-all"
             style={{
-              background: skipped ? 'var(--surface-2)' : 'var(--accent)',
-              color: skipped ? 'var(--text-muted)' : 'var(--accent-contrast)',
-              cursor: skipped ? 'not-allowed' : 'pointer',
+              background: skipped || claimed ? 'var(--surface-2)' : 'var(--accent)',
+              color: claimed ? 'var(--success)' : skipped ? 'var(--text-muted)' : 'var(--accent-contrast)',
+              cursor: skipped || claimed ? 'not-allowed' : 'pointer',
               opacity: skipped ? 0.6 : 1,
             }}
           >
-            Claim +30 pts
+            {claimed ? 'Claimed ✓' : 'Claim +30 pts'}
           </button>
           {showTooltip && skipped && (
             <div
