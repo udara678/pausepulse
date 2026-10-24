@@ -121,6 +121,37 @@ npm run build
 
 ---
 
+## 🐳 DevOps & Deployment
+
+### Docker (Containerized Setup)
+```bash
+# Build and run all services with Docker Compose
+docker compose up --build
+
+# Services:
+# Frontend (React)  → http://localhost:5173
+# Backend (Express) → http://localhost:5000
+# Admin Dashboard   → http://localhost:5000/admin
+```
+
+### CI/CD Pipeline (GitHub Actions)
+Every `git push` to `main` automatically:
+1. ✅ Runs TypeScript type-check & linting
+2. ✅ Builds production Docker images
+3. ✅ Pushes tagged images to Docker Hub
+4. ✅ Deploys to AWS EC2 via SSH with Nginx reverse proxy
+
+### Tech Stack — Infrastructure Layer
+
+| Layer | Technology |
+|---|---|
+| Containerization | Docker + Docker Compose (Multi-stage builds) |
+| CI/CD | GitHub Actions (automated test → build → deploy) |
+| Cloud Hosting | AWS EC2 (Ubuntu) + Nginx Reverse Proxy |
+| Image Registry | Docker Hub |
+
+---
+
 ## 📸 Screenshots
 
 > _Add screenshots here once app is running_
@@ -141,7 +172,7 @@ npm run build
 
 ## 👤 Author
 
-Built by **[Your Name]** — [Portfolio](https://yourwebsite.com) · [LinkedIn](https://linkedin.com/in/yourprofile)
+Built by **[K.A. Udara Hansana Kodikara](https://github.com/udara678)** — [GitHub](https://github.com/udara678) · [LinkedIn](https://linkedin.com/in/udara-hansana)
 
 ---
 
