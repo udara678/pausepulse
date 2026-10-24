@@ -42,29 +42,14 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Build Backend Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./server
-          file: ./server/Dockerfile
-          push: false
-          tags: pausepulse-backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: |
+          docker build -t pausepulse-backend:latest ./server
 
       - name: Build Frontend (Nginx) Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          tags: pausepulse-frontend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: |
+          docker build -t pausepulse-frontend:latest .
 
-      - name: Verify Docker Compose Config
+      - name: Verify Docker Compose Configuration
         run: |
           docker compose config
