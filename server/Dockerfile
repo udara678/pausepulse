@@ -1,20 +1,19 @@
-FROM node:20-slim
+FROM node:20
 
 WORKDIR /app
 
-# Install openssl and ca-certificates for Prisma engine downloads
-RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
-
-# Copy package files and install dependencies
+# Copy dependency specifications
 COPY package*.json ./
 COPY tsconfig*.json ./
-RUN npm install --legacy-peer-deps
+
+# Install exact dependencies
+RUN npm ci
 
 # Copy Prisma schema and generate client
 COPY prisma ./prisma
 RUN npx prisma generate
 
-# Copy source code and compile TypeScript
+# Copy application source code and compile TypeScript
 COPY src ./src
 RUN npm run build
 
