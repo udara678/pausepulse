@@ -1,21 +1,14 @@
-FROM node:20
+FROM node:20-slim
 
 WORKDIR /app
 
-# Copy dependency specifications
+# Install openssl and ca-certificates for Prisma runtime
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
-COPY tsconfig*.json ./
-
-# Install exact dependencies
-RUN npm ci
-
-# Copy Prisma schema and generate client
 COPY prisma ./prisma
-RUN npx prisma generate
-
-# Copy application source code and compile TypeScript
-COPY src ./src
-RUN npm run build
+COPY dist ./dist
+COPY node_modules ./node_modules
 
 ENV NODE_ENV=production
 ENV PORT=5000
