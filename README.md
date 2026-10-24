@@ -7,12 +7,15 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/udara678/pausepulse/actions/workflows/ci-cd.yml">
+    <img src="https://github.com/udara678/pausepulse/actions/workflows/ci-cd.yml/badge.svg" alt="CI/CD Pipeline" />
+  </a>
+  <img src="https://img.shields.io/badge/Docker-Enabled-2496ED?style=flat-square&logo=docker&logoColor=white" />
+  <img src="https://img.shields.io/badge/Nginx-Reverse%20Proxy-009639?style=flat-square&logo=nginx&logoColor=white" />
   <img src="https://img.shields.io/badge/Electron-32.x-47848F?style=flat-square&logo=electron&logoColor=white" />
   <img src="https://img.shields.io/badge/React-19.x-61DAFB?style=flat-square&logo=react&logoColor=black" />
   <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white" />
-  <img src="https://img.shields.io/badge/Tailwind%20CSS-4.x-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white" />
   <img src="https://img.shields.io/badge/Express-5.x-000000?style=flat-square&logo=express&logoColor=white" />
-  <img src="https://img.shields.io/badge/Prisma-SQLite-2D3748?style=flat-square&logo=prisma&logoColor=white" />
 </p>
 
 ---
@@ -123,23 +126,28 @@ npm run build
 
 ## 🐳 DevOps & Deployment
 
-### Docker (Containerized Setup)
+### Container Architecture
+The web application and API are fully containerized using Docker and orchestrated with Docker Compose:
+- **Frontend Container:** Serves the optimized production Vite/React build via **Nginx** on port `80`.
+- **Backend API Container:** Runs the Node.js/Express REST API on internal port `5000`.
+- **Reverse Proxy Routing:** Nginx proxies incoming `/api/*` requests seamlessly to the backend container.
+
 ```bash
 # Build and run all services with Docker Compose
 docker compose up --build
 
 # Services:
-# Frontend (React)  → http://localhost:5173
-# Backend (Express) → http://localhost:5000
-# Admin Dashboard   → http://localhost:5000/admin
+# Web Application & UI  → http://localhost:80
+# Backend API Endpoints → http://localhost:80/api/health
+# Admin HR Portal       → http://localhost:80/admin
 ```
 
 ### CI/CD Pipeline (GitHub Actions)
-Every `git push` to `main` automatically:
-1. ✅ Runs TypeScript type-check & linting
-2. ✅ Builds production Docker images
-3. ✅ Pushes tagged images to Docker Hub
-4. ✅ Deploys to AWS EC2 via SSH with Nginx reverse proxy
+A production-grade CI/CD pipeline runs on every push to `main` branch (`.github/workflows/ci-cd.yml`):
+1. **Frontend Validation:** Lints, type-checks, and builds the Vite production bundle.
+2. **Backend Validation:** Generates Prisma client bindings, tests dependencies, and compiles TypeScript.
+3. **Docker Compose Validation:** Verifies service definitions and compose syntax.
+4. **Docker Image Builds:** Builds multi-tier production Docker images for both backend and frontend services.
 
 ### Tech Stack — Infrastructure Layer
 
