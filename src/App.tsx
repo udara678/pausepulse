@@ -26,8 +26,9 @@ import {
   ShieldAlert,
   Download,
   Utensils,
+  Palette,
 } from 'lucide-react';
-import { UserStats, Settings, TimerMode, AppTheme, UserPlan, PLAN_LIMITS, AllTimersState, ModeTimerState } from './types';
+import { UserStats, Settings, TimerMode, AppTheme, UserPlan, PLAN_LIMITS, AllTimersState, ModeTimerState, ActiveNavTab } from './types';
 import { soundEngine } from './utils/audio';
 import { SettingsModal } from './components/SettingsModal';
 import { FocusCheckpointModal } from './components/FocusCheckpointModal';
@@ -38,7 +39,11 @@ import { LicenseGate } from './components/LicenseGate';
 import { UpgradeModal } from './components/UpgradeModal';
 import { DetailedAnalytics } from './components/DetailedAnalytics';
 import { MoodCoach } from './components/MoodCoach';
+import { BubblePopGame } from './components/BubblePopGame';
 import { CompletedActivityLog } from './types';
+import { BackgroundColorMixer, getOrbColorPreview, getDynamicThemeTokens } from './components/BackgroundColorMixer';
+import { SettingsTab } from './components/SettingsTab';
+import { FuturisticSidebar } from './components/FuturisticSidebar';
 import { GlobeCollection } from '@designcodeio/threeui';
 import '@designcodeio/threeui/style.css';
 
@@ -60,6 +65,9 @@ const DEFAULT_SETTINGS: Settings = {
   selectedTone: 'chime',
   theme: 'dark',
   reduceMotion: false,
+  orbHue: 0,
+  orbSaturation: 1.0,
+  orbGlow: 1.0,
 };
 
 function getInitialTimers(settings: Settings): AllTimersState {
@@ -121,8 +129,6 @@ function getInitialTimers(settings: Settings): AllTimersState {
 
   return defaults;
 }
-
-type ActiveNavTab = 'TIMER' | 'HYDRATION' | 'MOOD' | 'BREATHING' | 'GAMES' | 'ANALYTICS' | 'ACHIEVEMENTS' | 'HR_PORTAL';
 
 interface TabErrorBoundaryProps {
   children: React.ReactNode;
@@ -218,6 +224,37 @@ export default function App() {
     }
   });
 
+  // 3D Background Orb Config (Hue, Saturation, Glow)
+  const [orbConfig, setOrbConfig] = useState<{ hue: number; saturation: number; glow: number }>(() => {
+    try {
+      const cached = localStorage.getItem('pausepulse_orb_config');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return {
+      hue: settings.orbHue ?? 0,
+      saturation: settings.orbSaturation ?? 1.0,
+      glow: settings.orbGlow ?? 1.0,
+    };
+  });
+
+  const handleOrbConfigChange = (updates: { hue?: number; saturation?: number; glow?: number }) => {
+    setOrbConfig((prev) => {
+      const next = { ...prev, ...updates };
+      try {
+        localStorage.setItem('pausepulse_orb_config', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleOrbReset = () => {
+    const def = { hue: 0, saturation: 1.0, glow: 1.0 };
+    setOrbConfig(def);
+    try {
+      localStorage.setItem('pausepulse_orb_config', JSON.stringify(def));
+    } catch {}
+  };
+
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isCheckpointOpen, setIsCheckpointOpen] = useState<boolean>(false);
   const [showWelcomeBackBanner, setShowWelcomeBackBanner] = useState<boolean>(false);
@@ -255,7 +292,6 @@ export default function App() {
   const [isBreathingActive, setIsBreathingActive] = useState<boolean>(false);
 
   // Bubble Game states
-  const [bubbles, setBubbles] = useState<Array<{ id: number; popped: boolean; color: string }>>([]);
   const [gameScore, setGameScore] = useState<number>(0);
 
   // Guided Mood Timer states
@@ -313,6 +349,25 @@ export default function App() {
   useEffect(() => {
     setStats((prev) => ({ ...prev, waterTargetMl: settings.waterTargetMl }));
   }, [settings.waterTargetMl]);
+
+  // Synchronize dynamic app theme colors to match the 3D Animation Orb color
+  useEffect(() => {
+    const isDarkTheme = settings.theme === 'dark';
+    const tokens = getDynamicThemeTokens(orbConfig.hue, orbConfig.saturation, isDarkTheme);
+    const root = document.documentElement;
+
+    root.style.setProperty('--accent', tokens.accent);
+    root.style.setProperty('--accent-contrast', tokens.accentContrast);
+    root.style.setProperty('--accent-glow', tokens.accentGlow);
+    root.style.setProperty('--focus', tokens.focus);
+    root.style.setProperty('--border', tokens.border);
+    root.style.setProperty('--timer-start', tokens.timerStart);
+    root.style.setProperty('--timer-mid', tokens.timerMid);
+    root.style.setProperty('--timer-end', tokens.timerEnd);
+    root.style.setProperty('--surface', tokens.surface);
+    root.style.setProperty('--surface-2', tokens.surface2);
+    root.style.setProperty('--sky-gradient', tokens.skyGradient);
+  }, [orbConfig.hue, orbConfig.saturation, settings.theme]);
 
   // Live timer tick: computes remaining time from Date.now() and endTimestamp
   useEffect(() => {
@@ -625,27 +680,13 @@ export default function App() {
     };
   }, [isGuidedRunning, guidedTimerSecs, settings.soundEnabled]);
 
-  // Initialize bubbles for bubble game
+  // Initialize bubble game score
   useEffect(() => {
-    resetBubbleGame();
+    setGameScore(0);
   }, []);
 
   const resetBubbleGame = () => {
-    const colors = ['bg-cyan-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500'];
-    setBubbles(
-      Array.from({ length: 16 }, (_, i) => ({
-        id: i,
-        popped: false,
-        color: colors[i % colors.length],
-      }))
-    );
     setGameScore(0);
-  };
-
-  const handlePopBubble = (id: number) => {
-    setBubbles((prev) => prev.map((b) => (b.id === id ? { ...b, popped: true } : b)));
-    setGameScore((s) => s + 10);
-    if (settings.soundEnabled) soundEngine.playTone('splash');
   };
 
   const handleSaveCheckpoint = (note: string) => {
@@ -812,38 +853,19 @@ export default function App() {
       {/* ═══════════════════════════════════════════════
            TOP TITLE BAR (Mac Traffic Lights + Mode Info Pill + Controls)
          ═══════════════════════════════════════════════ */}
-      <header className="titlebar-drag relative z-20 h-12 flex-shrink-0 flex items-center justify-between px-4 border-b border-[var(--border)] glass-panel transition-colors">
-        {/* Left: Window Control Dots */}
-        <div className="flex items-center space-x-2.5 titlebar-nodrag">
-          <button
-            type="button"
-            onClick={() => window.electronAPI?.closeWindow?.() || window.electronAPI?.hideWindow?.()}
-            className="w-3 h-3 rounded-full bg-rose-500/80 hover:bg-rose-500 transition-colors shadow-xs cursor-pointer"
-            title="Close / Hide"
+      <header className="titlebar-drag relative z-20 h-14 flex-shrink-0 flex items-center justify-between px-4 border-b border-[var(--border)] glass-panel transition-colors">
+        {/* Left: Application Logo (High-visibility, large, glowing) */}
+        <div
+          className="flex items-center space-x-3 titlebar-nodrag cursor-pointer select-none group py-0.5 px-2 rounded-xl transition-all duration-200 hover:bg-[var(--surface-2)]/60"
+          onClick={() => setActiveTab('TIMER')}
+          title="PausePulse - Click to return to Focus Timer"
+        >
+          <img
+            src={isDark ? '/logo.png' : '/logo-light-mode.png'}
+            alt="PausePulse"
+            className="h-9 w-auto object-contain transition-all duration-200 group-hover:scale-105 drop-shadow-[0_0_12px_rgba(99,102,241,0.35)]"
           />
-          <button
-            type="button"
-            onClick={() => window.electronAPI?.minimizeWindow?.()}
-            className="w-3 h-3 rounded-full bg-amber-500/80 hover:bg-amber-500 transition-colors shadow-xs cursor-pointer"
-            title="Minimize"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              if (isAnyRunning && runningMode) {
-                handlePauseTimer(runningMode);
-              } else {
-                handleStartTimer(displayedMode);
-              }
-            }}
-            className="w-3 h-3 rounded-full bg-emerald-500/80 hover:bg-emerald-500 transition-colors shadow-xs cursor-pointer"
-            title={isAnyRunning ? 'Pause Running Timer' : `Start ${displayedMode} Timer`}
-          />
-
-          <span className="text-xs font-bold tracking-tight ml-2 text-[var(--text)]">
-            PausePulse
-          </span>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--border)]">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--border)] font-mono tracking-tight shadow-xs">
             v2.1
           </span>
         </div>
@@ -902,6 +924,16 @@ export default function App() {
             <Bell className="w-3.5 h-3.5" />
           </button>
 
+          {/* Ambient Orb Color Indicator */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('BACKGROUND_COLOR')}
+            className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors cursor-pointer"
+            title={`Orb Color: ${Math.round(orbConfig.hue)}° (Click to open Full Background View)`}
+          >
+            <Palette className="w-3.5 h-3.5" style={{ color: getOrbColorPreview(orbConfig.hue, orbConfig.saturation) }} />
+          </button>
+
           {/* Theme Toggle */}
           <button
             type="button"
@@ -911,16 +943,6 @@ export default function App() {
           >
             {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-[var(--accent)]" />}
           </button>
-
-          {/* Settings */}
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(true)}
-            className="p-1.5 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--surface-2)] transition-colors cursor-pointer"
-            title="Open Settings"
-          >
-            <Sliders className="w-3.5 h-3.5" />
-          </button>
         </div>
       </header>
 
@@ -928,119 +950,17 @@ export default function App() {
            MAIN BODY: Left Sidebar + Right Content View
          ═══════════════════════════════════════════════ */}
       <div className="relative z-10 flex-1 flex overflow-hidden">
-        {/* ── LEFT SIDEBAR ────────────────────────────── */}
-        <aside className="w-60 flex-shrink-0 flex flex-col justify-between p-3.5 border-r border-[var(--border)] glass-panel transition-colors">
-          {/* Nav List */}
-          <div className="space-y-1">
-            <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider px-3 mb-2 flex items-center justify-between">
-              <span>Dashboard</span>
-              <span className="text-[9px] text-[var(--accent)] font-mono lowercase">
-                {userPlan} tier
-              </span>
-            </div>
-
-            {[
-              { id: 'TIMER', icon: Clock, label: 'Focus Timer', badge: isAnyRunning ? 'Live' : undefined },
-              { id: 'HYDRATION', icon: Droplets, label: 'Hydration', badge: `${stats.waterIntakeMl}ml` },
-              {
-                id: 'MOOD',
-                icon: Smile,
-                label: 'Mood Coach',
-                badge: PLAN_LIMITS[userPlan].fullMoodCoach ? '9 Moods' : '3 Free',
-              },
-              { id: 'BREATHING', icon: Heart, label: 'Breathing', badge: '3-Phase' },
-              {
-                id: 'GAMES',
-                icon: Gamepad2,
-                label: 'Stress Buster',
-                badge: PLAN_LIMITS[userPlan].bubbleGame ? 'Mini Game' : '🔒 Pro',
-              },
-              {
-                id: 'ANALYTICS',
-                icon: BarChart3,
-                label: 'Personal Analytics',
-                badge: PLAN_LIMITS[userPlan].detailedAnalytics ? '7-Day' : '🔒 Pro',
-              },
-              { id: 'ACHIEVEMENTS', icon: Trophy, label: 'Achievements', badge: `${stats.points} pts` },
-              {
-                id: 'HR_PORTAL',
-                icon: Crown,
-                label: 'Corporate HR',
-                badge: PLAN_LIMITS[userPlan].hrDashboard ? 'Team' : '🔒 Team',
-              },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id as ActiveNavTab)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-[var(--accent)] text-[var(--accent-contrast)] shadow-md font-bold'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-[var(--accent-contrast)]' : 'text-[var(--text-muted)]'}`} />
-                    <span>{tab.label}</span>
-                  </div>
-                  {tab.badge && (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono ${
-                        isActive
-                          ? 'bg-white/20 text-white'
-                          : tab.badge.includes('🔒')
-                          ? 'bg-amber-500/15 text-amber-500 border border-amber-500/20'
-                          : 'glass-pill text-[var(--text-muted)]'
-                      }`}
-                    >
-                      {tab.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Bottom Card: Your Level Card */}
-          <div className="space-y-2 pt-3 border-t border-[var(--border)]">
-            <div className="p-3 rounded-2xl border border-[var(--border)] glass-pill shadow-sm">
-              <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-semibold mb-1">
-                <span>Your Level</span>
-                {!PLAN_LIMITS[userPlan].allTiers && (
-                  <span className="text-[9px] text-[var(--warning)] font-bold">Trial Cap Lvl 2</span>
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-black text-[var(--accent)] flex items-center gap-1">
-                  <Zap className="w-3.5 h-3.5 fill-current" />
-                  <span>{levelInfo.name}</span>
-                </div>
-                <div className="text-xs font-extrabold text-[var(--hydration)] font-mono">
-                  {stats.points.toLocaleString()} pts
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="mt-2 h-1.5 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800">
-                <div
-                  className="h-full bg-gradient-to-r from-[var(--accent)] to-[var(--hydration)] transition-all duration-700"
-                  style={{ width: `${levelInfo.percent}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Floating Level Up Toast Notification */}
-            {levelUpToast && (
-              <div className="p-2 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-500 dark:text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 animate-in slide-in-from-bottom duration-300">
-                <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="truncate">{levelUpToast}</span>
-              </div>
-            )}
-          </div>
-        </aside>
+        {/* ── LEFT SIDEBAR (Futuristic Cyber Dock) ────── */}
+        <FuturisticSidebar
+          activeTab={activeTab}
+          setActiveTab={(tab) => setActiveTab(tab)}
+          isAnyRunning={isAnyRunning}
+          waterIntakeMl={stats.waterIntakeMl}
+          userPlan={userPlan}
+          points={stats.points}
+          levelInfo={levelInfo}
+          levelUpToast={levelUpToast}
+        />
 
         {/* ── RIGHT MAIN VIEW ─────────────────────────── */}
         <main className="relative flex-1 min-h-0 flex flex-col overflow-y-auto p-6 transition-colors bg-transparent">
@@ -1055,9 +975,9 @@ export default function App() {
               smokeScale={1.00}
               smokeStrength={1.00}
               smokeSpeed={isReducedMotion ? 0.00 : 1.00}
-              hue={0}
-              saturation={1.00}
-              glow={1.00}
+              hue={orbConfig.hue}
+              saturation={orbConfig.saturation}
+              glow={orbConfig.glow}
               starDensity={1.00}
               starSpeed={isReducedMotion ? 0.00 : 1.00}
               starSize={1.00}
@@ -1071,12 +991,12 @@ export default function App() {
             {activeTab === 'TIMER' && (
               <div className="relative z-10 flex-1 flex flex-col justify-between items-center w-full max-w-2xl mx-auto py-2 my-auto">
                 {/* Header Row / Mode Selector */}
-                <div className="w-full flex items-center justify-between glass-panel p-3.5 rounded-2xl mb-auto">
+                <div className="w-full flex items-center justify-between glass-panel p-3.5 rounded-2xl mb-auto group transition-all">
                   <div>
                     <h1 className="text-lg font-black tracking-tight text-[var(--text)]">
                       {displayedMode === 'FOCUS' ? 'Focus Session' : displayedMode === 'LUNCH' ? 'Lunch Break' : 'Resting Break'}
                     </h1>
-                    <p className="text-xs text-[var(--text-muted)]">
+                    <p className="text-xs text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                       {displayedMode === 'FOCUS'
                         ? 'Deep work mode active — eliminate distractions'
                         : displayedMode === 'LUNCH'
@@ -1098,8 +1018,10 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setDisplayedMode('FOCUS')}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          displayedMode === 'FOCUS' ? 'bg-[var(--accent)] text-[var(--accent-contrast)] shadow-xs' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                        className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer shadow-sm ${
+                          displayedMode === 'FOCUS'
+                            ? 'bg-[var(--accent)] text-[var(--accent-contrast)] ring-1 ring-white/20'
+                            : 'text-slate-300 hover:text-white'
                         }`}
                       >
                         Focus
@@ -1107,8 +1029,10 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setDisplayedMode('BREAK')}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          displayedMode === 'BREAK' ? 'bg-[var(--break)] text-white shadow-xs' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                        className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer shadow-sm ${
+                          displayedMode === 'BREAK'
+                            ? 'bg-[var(--break)] text-white ring-1 ring-white/20'
+                            : 'text-slate-300 hover:text-white'
                         }`}
                       >
                         Break
@@ -1116,8 +1040,10 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setDisplayedMode('LUNCH')}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center space-x-1 ${
-                          displayedMode === 'LUNCH' ? 'bg-[var(--lunch)] text-white shadow-xs' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                        className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center space-x-1 shadow-sm ${
+                          displayedMode === 'LUNCH'
+                            ? 'bg-[var(--lunch)] text-white ring-1 ring-white/20'
+                            : 'text-slate-300 hover:text-white'
                         }`}
                       >
                         <Utensils className="w-3 h-3 inline mr-1" />
@@ -1153,31 +1079,22 @@ export default function App() {
                 <div className="flex flex-col items-center justify-center my-auto py-4">
                   <div className="relative inline-flex items-center justify-center mb-6">
                     <svg width="220" height="220" viewBox="0 0 160 160" className="transform -rotate-90">
-                      {/* Outer glow ring */}
-                      <circle
-                        cx="80"
-                        cy="80"
-                        r={circleRadius + 4}
-                        fill="none"
-                        stroke="var(--border)"
-                        strokeWidth="2"
-                      />
-                      {/* Track ring */}
+                      {/* Clean background track */}
                       <circle
                         cx="80"
                         cy="80"
                         r={circleRadius}
                         fill="none"
-                        stroke="var(--border)"
+                        stroke="rgba(0, 0, 0, 0.45)"
                         strokeWidth="8"
                       />
-                      {/* Progress arc */}
+                      {/* Progress arc (Clean line without outer glow/shine) */}
                       <circle
                         cx="80"
                         cy="80"
                         r={circleRadius}
                         fill="none"
-                        stroke="url(#timerGradLavender)"
+                        stroke="url(#dynamicTimerGrad)"
                         strokeWidth="8"
                         strokeLinecap="round"
                         strokeDasharray={circumference}
@@ -1185,19 +1102,19 @@ export default function App() {
                         className="transition-all duration-1000 ease-linear"
                       />
                       <defs>
-                        <linearGradient id="timerGradLavender" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#a855f7" />
-                          <stop offset="60%" stopColor="#c084fc" />
-                          <stop offset="100%" stopColor="#e879f9" />
+                        <linearGradient id="dynamicTimerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="var(--timer-start, #a855f7)" />
+                          <stop offset="50%" stopColor="var(--timer-mid, #c084fc)" />
+                          <stop offset="100%" stopColor="var(--timer-end, #e879f9)" />
                         </linearGradient>
                       </defs>
                     </svg>
 
-                    <div className="absolute text-center px-4 py-2 rounded-2xl glass-panel shadow-xl">
-                      <div className="text-4xl font-black font-mono tracking-tight text-[var(--text)] drop-shadow-lg">
+                    <div className="absolute text-center px-5 py-2.5 rounded-2xl glass-panel shadow-md group/timer cursor-pointer border border-white/10 bg-slate-950/60 backdrop-blur-md">
+                      <div className="text-4xl font-black font-mono tracking-tight text-white drop-shadow-md">
                         {formatTime(currentRemaining)}
                       </div>
-                      <div className="text-[10px] text-[var(--text-muted)] font-semibold tracking-wider uppercase mt-1">
+                      <div className="text-[10px] text-slate-300 font-bold tracking-wider uppercase mt-1 opacity-0 group-hover/timer:opacity-100 transition-opacity duration-200">
                         {displayedMode === 'FOCUS'
                           ? 'remaining'
                           : displayedMode === 'LUNCH'
@@ -1210,9 +1127,10 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  {/* Main Action Controls */}
-                  <div className="flex items-center space-x-3 flex-wrap gap-y-2 justify-center">
+                {/* Main Action Controls */}
+                <div className="flex items-center space-x-3 flex-wrap gap-y-2 justify-center">
                     {/* ── Start / Resume button when not running ── */}
                     {timers[displayedMode].status !== 'running' && (
                       <button
@@ -1309,25 +1227,30 @@ export default function App() {
                       </button>
                     )}
                   </div>
-                </div>
 
-                {/* ── BOTTOM STATS ROW ── */}
+                {/* ── BOTTOM STATS ROW (Always Visible) ── */}
                 <div className="w-full grid grid-cols-3 gap-3 mt-auto">
-                  <div className="glass-panel rounded-2xl p-4 text-center">
+                  <div className="glass-panel rounded-2xl p-4 text-center transition-all hover:border-[var(--accent)]/50">
                     <div className="text-2xl font-black text-[var(--hydration)] font-mono">{stats.breaksCompleted}</div>
-                    <div className="text-xs text-[var(--text-muted)] font-medium mt-0.5">Sessions today</div>
+                    <div className="text-xs text-[var(--text-muted)] font-medium mt-0.5">
+                      Sessions today
+                    </div>
                   </div>
 
-                  <div className="glass-panel rounded-2xl p-4 text-center">
+                  <div className="glass-panel rounded-2xl p-4 text-center transition-all hover:border-[var(--accent)]/50">
                     <div className="text-2xl font-black text-[var(--accent)] font-mono">
                       💧 {Math.round(stats.waterIntakeMl / 250)}/8
                     </div>
-                    <div className="text-xs text-[var(--text-muted)] font-medium mt-0.5">Water glasses</div>
+                    <div className="text-xs text-[var(--text-muted)] font-medium mt-0.5">
+                      Water glasses
+                    </div>
                   </div>
 
-                  <div className="glass-panel rounded-2xl p-4 text-center">
+                  <div className="glass-panel rounded-2xl p-4 text-center transition-all hover:border-[var(--accent)]/50">
                     <div className="text-2xl font-black text-[var(--warning)] font-mono">🔥 {stats.streakDays}</div>
-                    <div className="text-xs text-[var(--text-muted)] font-medium mt-0.5">Day streak</div>
+                    <div className="text-xs text-[var(--text-muted)] font-medium mt-0.5">
+                      Day streak
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1478,60 +1401,15 @@ export default function App() {
                   </button>
                 </div>
               ) : (
-                <div className="glass-panel p-6 rounded-3xl space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-lg font-black tracking-tight text-[var(--text)]">Bubble Pop Stress Buster</h2>
-                      <p className="text-xs text-[var(--text-muted)]">Pop bubbles to relieve micro-stress & fatigue</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-bold text-[var(--warning)] font-mono">Score: {gameScore} pts</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-3 p-4 rounded-2xl glass-pill border border-[var(--border)]">
-                    {bubbles.map((b) => (
-                      <button
-                        key={b.id}
-                        type="button"
-                        onClick={() => !b.popped && handlePopBubble(b.id)}
-                        className={`w-14 h-14 rounded-full transition-all duration-300 flex items-center justify-center text-sm font-bold shadow-md cursor-pointer ${
-                          b.popped ? 'scale-50 opacity-20 bg-slate-800 text-slate-600' : `${b.color} hover:scale-110 active:scale-90 text-white`
-                        }`}
-                      >
-                        {b.popped ? '💥' : '🎈'}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        resetBubbleGame();
-                      }}
-                      className="px-4 py-2 rounded-xl glass-pill border border-[var(--border)] text-[var(--text)] text-xs font-semibold cursor-pointer hover:bg-[var(--surface-2)]"
-                    >
-                      Reset Grid
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={gameScore < 50 || gameSessionClaimed}
-                      onClick={() => handleClaimBonus(30, 'Stress Buster Game', 'game')}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                        gameSessionClaimed
-                          ? 'glass-pill text-[var(--success)] border border-[var(--success)]/40 cursor-not-allowed'
-                          : gameScore >= 50
-                          ? 'bg-[var(--success)] hover:opacity-90 text-white shadow-md shadow-emerald-500/30 cursor-pointer animate-pulse'
-                          : 'glass-pill text-[var(--text-muted)] cursor-not-allowed opacity-60'
-                      }`}
-                    >
-                      <Sparkles className="w-3.5 h-3.5 inline mr-1" />
-                      <span>{gameSessionClaimed ? 'Claimed ✓' : 'Claim +30 Pts'}</span>
-                    </button>
-                  </div>
-                </div>
+                <BubblePopGame
+                  theme={settings.theme}
+                  soundEnabled={settings.soundEnabled}
+                  gameSessionClaimed={gameSessionClaimed}
+                  gameScore={gameScore}
+                  onScoreChange={(delta) => setGameScore(s => s + delta)}
+                  onClaimPoints={() => handleClaimBonus(30, 'Stress Buster Game', 'game')}
+                  onResetGame={resetBubbleGame}
+                />
               )}
             </div>
           )}
@@ -1569,6 +1447,62 @@ export default function App() {
                 onBackToApp={() => setActiveTab('TIMER')}
                 onUpgradeClick={() => openUpgradeModal('HR Corporate Portal & Seats')}
               />
+            </div>
+          )}
+
+          {/* TAB 9: SETTINGS & PREFERENCES */}
+          {activeTab === 'SETTINGS' && (
+            <SettingsTab
+              settings={settings}
+              orbConfig={orbConfig}
+              onSaveSettings={handleSaveSettings}
+              onOrbConfigChange={handleOrbConfigChange}
+              onOrbReset={handleOrbReset}
+            />
+          )}
+
+          {/* TAB 10: BACKGROUND ORB & LIVE FULL-VIEW COLOR MIXER */}
+          {activeTab === 'BACKGROUND_COLOR' && (
+            <div className="relative z-10 flex-1 flex flex-col justify-between items-center w-full max-w-2xl mx-auto py-2 my-auto">
+              {/* Header Card */}
+              <div className="w-full flex items-center justify-between glass-panel p-3.5 rounded-2xl mb-auto">
+                <div>
+                  <h1 className="text-lg font-black tracking-tight text-[var(--text)] flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-[var(--accent)]" />
+                    <span>Background Orb & Color Mixer</span>
+                  </h1>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Adjust the glowing 3D energy orb in full view with instant visual feedback
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOrbReset}
+                  className="px-3 py-1.5 rounded-xl border border-[var(--border)] text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Default</span>
+                </button>
+              </div>
+
+              {/* The center is completely unobstructed so the 3D Orb is 100% visible */}
+              <div className="flex-1 w-full min-h-[340px] flex items-center justify-center pointer-events-none">
+                <div className="text-center opacity-0 hover:opacity-100 transition-opacity p-2 rounded-full glass-pill text-[10px] text-[var(--text-muted)] font-mono">
+                  3D Bio-Luminescent Energy Orb
+                </div>
+              </div>
+
+              {/* Floating Bottom Ambient Color Mixer Bar */}
+              <div className="w-full mt-auto">
+                <BackgroundColorMixer
+                  hue={orbConfig.hue}
+                  saturation={orbConfig.saturation}
+                  glow={orbConfig.glow}
+                  theme={settings.theme}
+                  onChange={handleOrbConfigChange}
+                  onReset={handleOrbReset}
+                />
+              </div>
             </div>
           )}
           </TabErrorBoundary>

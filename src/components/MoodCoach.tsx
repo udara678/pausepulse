@@ -97,14 +97,8 @@ export const MoodCoach: React.FC<MoodCoachProps> = ({
     } else if (activity.actionType === 'navigate_timer') {
       onNavigateTo('TIMER', 'start_focus');
     } else if (activity.actionType === 'log_water') {
-      onAddWater(250);
-      // Claim points immediately for log water
-      const key = `${moodId}-${activityId}`;
-      if (!claimedActivities.has(key)) {
-        setClaimedActivities(prev => new Set(prev).add(key));
-        onClaimPoints(30, activity.title);
-        onLogActivity({ moodId, activityId, activityTitle: activity.title, timestamp: Date.now() });
-      }
+      // Navigate to Hydration tab so the user can log water there naturally
+      onNavigateTo('HYDRATION');
     }
   };
 

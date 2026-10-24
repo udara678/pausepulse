@@ -66,6 +66,18 @@ export interface ModeTimerState {
 
 export type AllTimersState = Record<TimerMode, ModeTimerState>;
 
+export type ActiveNavTab =
+  | 'TIMER'
+  | 'HYDRATION'
+  | 'MOOD'
+  | 'BREATHING'
+  | 'GAMES'
+  | 'ANALYTICS'
+  | 'ACHIEVEMENTS'
+  | 'HR_PORTAL'
+  | 'SETTINGS'
+  | 'BACKGROUND_COLOR';
+
 export interface Settings {
   hydrationIntervalMins: number;
   breakIntervalMins: number;      // Focus session duration (e.g., 25 mins)
@@ -82,6 +94,9 @@ export interface Settings {
   customSoundUrl?: string;
   customSoundName?: string;
   eapHelplineUrl?: string;        // Configurable Employee Assistance / Helpline URL
+  orbHue?: number;                // 3D Background Orb Hue (0-360)
+  orbSaturation?: number;         // 3D Background Orb Saturation (0.2-2.0)
+  orbGlow?: number;               // 3D Background Orb Glow Intensity (0.5-2.0)
 }
 
 export interface CompletedActivityLog {

@@ -13,7 +13,7 @@
     "build": "npm run build:electron && npm run build:ui && npm run build:server",
     "dist": "npm run build && electron-builder",
     "server": "npx tsx server/src/index.ts",
-    "electron:dev": "concurrently \"vite\" \"node ./node_modules/typescript/lib/tsc.js -p tsconfig.electron.json --watch\" \"electron .\""
+    "electron:dev": "concurrently \"vite\" \"node ./node_modules/typescript/lib/tsc.js -p tsconfig.electron.json --watch\" \"npx wait-on http://localhost:5173 && electron .\""
   },
   "build": {
     "appId": "com.pausepulse.desktop",

@@ -17,6 +17,10 @@
   --break: #10b981;
   --lunch: #f59e0b;
   --hydration: #06b6d4;
+  --timer-start: #7e22ce;
+  --timer-mid: #a855f7;
+  --timer-end: #e879f9;
+  --accent-glow: rgba(168, 85, 247, 0.45);
   --sky-gradient: radial-gradient(ellipse at 50% 20%, rgba(46, 16, 101, 0.45) 0%, rgba(9, 8, 18, 0.98) 75%);
 }
 
@@ -38,6 +42,10 @@
   --break: #047857;          /* Emerald-700 */
   --lunch: #b45309;          /* Amber-700 */
   --hydration: #0e7490;      /* Cyan-700 */
+  --timer-start: #6d28d9;
+  --timer-mid: #7c3aed;
+  --timer-end: #c084fc;
+  --accent-glow: rgba(124, 58, 237, 0.35);
   --sky-gradient: linear-gradient(180deg, #ede9fe 0%, #fae8ff 45%, #e0e7ff 100%);
 }
 
