@@ -39,8 +39,8 @@ jobs:
 
       - name: Build Backend Docker Image
         run: |
-          docker build -t pausepulse-backend:latest ./server
+          docker build --progress=plain -t pausepulse-backend:latest ./server > build_backend.log 2>&1 || (cat build_backend.log && exit 1)
 
       - name: Build Frontend Docker Image
         run: |
-          docker build -t pausepulse-frontend:latest .
+          docker build --progress=plain -t pausepulse-frontend:latest . > build_frontend.log 2>&1 || (cat build_frontend.log && exit 1)
