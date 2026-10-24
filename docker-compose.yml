@@ -1,0 +1,39 @@
+services:
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: pausepulse-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - DATABASE_URL=file:./prisma/dev.db
+      - JWT_SECRET=${JWT_SECRET:-super-secret-jwt-key-for-devops}
+    volumes:
+      - backend-db:/app/prisma
+    networks:
+      - pausepulse-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pausepulse-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - pausepulse-network
+
+networks:
+  pausepulse-network:
+    driver: bridge
+
+volumes:
+  backend-db:
+    driver: local

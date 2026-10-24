@@ -1,0 +1,70 @@
+name: PausePulse CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-and-build:
+    name: Code Validation & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Frontend Dependencies & Build UI
+        run: |
+          npm ci --legacy-peer-deps
+          npm run build:ui
+
+      - name: Install Backend Dependencies & Compile TypeScript
+        working-directory: ./server
+        run: |
+          npm ci
+          npx prisma generate
+          npm run build
+
+  docker-build:
+    name: Docker Containerization Build
+    needs: test-and-build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: false
+          tags: pausepulse-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Frontend (Nginx) Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: pausepulse-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify Docker Compose Config
+        run: |
+          docker compose config
